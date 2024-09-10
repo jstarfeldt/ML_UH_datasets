@@ -14,3 +14,8 @@ BAND_NAMES = {
     13: "GOES_LWIR_Brightness_Temp",
     14: "GOES_Dirty_LWIR_Brightness_temp",
 }
+
+LANDSAT_CLOUD_FLAG_BIT = 6
+LANDSAT_CLOUD_MASK_BAND_IDX = 6
+CLOUD_FLAG = 1
+NON_CLOUD_FLAG = 0
