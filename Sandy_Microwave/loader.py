@@ -35,7 +35,7 @@ class Microwave_Loader:
         filename_middle = str(year_iter)
         print(f"initial formatted date: {filename_middle}")
 
-        # want to 
+        # do while loop to execute at least first day of loading data & plotting
         while(True):
             dataset_filename = self.get_dataset_filename(filename_middle)
             print(f"Dataset filename: {dataset_filename}")
@@ -65,7 +65,7 @@ class Microwave_Loader:
     :returns: str representing the next file we will process
     '''
     
-    def get_dataset_filename(self, filename_middle: str):
+    def get_dataset_filename(self, filename_middle: str) -> str:
         # these two always stay the same for all files
         filename_base = f"{os.getcwd()}\\mw_lst_{str(self.year)}\\MW_LST_DTC_{str(self.year)}"
         filename_end = "_x1y.h5"
@@ -76,6 +76,8 @@ class Microwave_Loader:
 
     :param dataset: microwave dataset as np array
     :returns: pyplot (matplotlib) object representing the two plotted time slices
+
+    TODO: make it so that we don't just have hardcoded times of day
     '''
     def plot_data(self, dataset: np.array, month: int, day: int) -> plt.figure:
         # right now I only support 2 plots per day, evenly spaced
@@ -94,22 +96,21 @@ class Microwave_Loader:
         ax2.set_xlabel("Latitude")
         ax2.set_ylabel("Longitude")
         return fig
-    
 
     '''
-    I want to add the iteration of days/months into this class, 
-    rather than having it all be in the loader
+    Handles iteration through days of the year. 
+    TODO: add functionality for variable step length (i.e. throughout the day and throughout the year)
     '''
     class Year_Iterator:
 
         NUM_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
-        def __init__(self, start_month: int, start_day: int):
+        def __init__(self, start_month: int, start_day: int) -> None:
             # track date
             self.day = start_day
             self.month = start_month
 
-        def __str__(self):
+        def __str__(self) -> str:
             
             # formats month, day for filename use
             def stringify_date(date: int) -> str:
@@ -160,21 +161,6 @@ class Microwave_Loader:
         '''
         def has_next(self) -> bool:
             return (not(self.day == 31 and self.month == 12))
-        
-        # def get_bounds(self) -> int:
-        #     days_left = 0
-        #     first_month = True
-
-        #     # calculate number of days left based on what month/day we are starting on
-        #     for month_days in (self.NUM_DAYS[self.month-1:]):
-        #         if (first_month): # we don't necessarily start on first day of month
-        #             days_left += month_days - self.day
-        #             first_month = False
-        #         else: # all other months we do a full month of iterations
-        #             days_left += month_days
-            
-        #     # for iteration purposes we need this
-        #     return days_left + 1
 
 
     
