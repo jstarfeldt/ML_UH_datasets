@@ -1,5 +1,6 @@
 from loader import Microwave_Loader
 
-
-loader = Microwave_Loader(6, 1)
+# load the microwave data and iterate thru it
+loader = Microwave_Loader(12, 30)
+loader.iterate_data()
 
