@@ -21,32 +21,56 @@ TODO: allow us to iterate a variable number of days per month
 
 class Microwave_Loader:
     
-    def __init__(self, month: int = 1, day: int = 1, year: int = 2023) -> None:
+    def __init__(self, month: int = 1, day: int = 1, year: int = 2023, interval: int = 1) -> None:
         # track the current date
         self.month = month
         self.day = day
         self.year = year
 
-    '''
-    Called on init, loads up the data in the given 
-    '''
-    def iterate_data(self) -> None:
-        year_iter = self.Year_Iterator(self.month, self.day)
+        # number of days between iteration
+        self.interval = interval
+
+    # purely for testing
+    def iterate_two(self) -> None:
+        year_iter = self.Year_Iterator(self.month, self.day, self.interval)
         filename_middle = str(year_iter)
         print(f"initial formatted date: {filename_middle}")
+
+        while(True):
+            dataset_filename = self.get_dataset_filename(filename_middle)
+            print(f"Dataset filename: {dataset_filename}")
+            # dataset = self.get_dataset(dataset_filename)
+            
+            # need to save plot sometime
+            if (not(year_iter.has_next())):
+                break
+            
+            filename_middle: str = next(year_iter)
+
+    '''
+    Called on init, loads up the data in the given 
+    TODO: fix wrapping around with iterator (went from 2023-12-30 to 2023-04-13 with interval of 5)
+    '''
+    def iterate_data(self) -> None:
+        # year iterator increments date and returns a string date to be used in filename
+        year_iter = self.Year_Iterator(self.month, self.day, self.interval)
+        filename_middle = str(year_iter)
+        print(f"initial formatted date: {filename_middle}")
+        pdf = PdfPages("Microwave_Plots.pdf")
 
         # do while loop to execute at least first day of loading data & plotting
         while(True):
             dataset_filename = self.get_dataset_filename(filename_middle)
             print(f"Dataset filename: {dataset_filename}")
             dataset = self.get_dataset(dataset_filename)
-            plot = self.plot_data(dataset, *year_iter.get_date_tuple())
-            plt.show() # not sure if this works
+            self.plot_data(dataset, *year_iter.get_date_tuple(), pdf)
+            
             # need to save plot sometime
             if (not(year_iter.has_next())):
+                pdf.close()
                 break
             
-            filename_middle: str = next(year_iter.get_date())
+            filename_middle: str = next(year_iter)
     
     '''
     Convert filename string into 3D microwave data
@@ -79,7 +103,7 @@ class Microwave_Loader:
 
     TODO: make it so that we don't just have hardcoded times of day
     '''
-    def plot_data(self, dataset: np.array, month: int, day: int) -> plt.figure:
+    def plot_data(self, dataset: np.array, month: int, day: int, pdf: PdfPages) -> plt.figure:
         # right now I only support 2 plots per day, evenly spaced
         fig, (ax1, ax2) = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(12, 12), dpi=80)
         plt.subplots_adjust(wspace=0.3)
@@ -95,23 +119,27 @@ class Microwave_Loader:
         ax2.set_title(f"Evening on: {month}/{day}")
         ax2.set_xlabel("Latitude")
         ax2.set_ylabel("Longitude")
+
+        pdf.savefig()
         return fig
 
     '''
     Handles iteration through days of the year. 
-    TODO: add functionality for variable step length (i.e. throughout the day and throughout the year)
     '''
     class Year_Iterator:
 
         NUM_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-
-        def __init__(self, start_month: int, start_day: int) -> None:
+        
+        def __init__(self, start_month: int, start_day: int, interval: int = 1) -> None:
             # track date
             self.day = start_day
             self.month = start_month
+            self.interval = interval
 
+        '''
+        :returns: str representing month/day with leading 0s, if necessary
+        '''
         def __str__(self) -> str:
-            
             # formats month, day for filename use
             def stringify_date(date: int) -> str:
                 toReturn = ""
@@ -124,40 +152,66 @@ class Microwave_Loader:
         '''
         Increments day
 
-        TODO: variable step
+        TODO: fix variable step for special case: step is larger than a whole month
         '''
-        def update_day(self) -> None:
-            days_this_month: int = self.NUM_DAYS[self.month-1]
-            self.day += 1
-            # after day iteration we may pass into a new month 
-            if (self.day > days_this_month):
-                self.month += 1
-                self.day = self.day % days_this_month # should always be 1
-            # wrap around to Jan if we pass Dec
-            if (self.month == 13):
-                self.month = 1
-                self.day = self.day % days_this_month # should always be 1
+        def perform_iteration(self, month: int, day: int, interval: int) -> tuple[int, int]:
+            return self.iterate_day(*self.iterate_month(month, day, interval))
+        
+        def iterate_day(self, month: int, day: int, interval: int) -> tuple[int, int]:
+            if ((day + interval) > self.NUM_DAYS[month-1]):
+                return (month + 1, (day + interval) % self.NUM_DAYS[month-1])
+            return (month, day + interval)
+        
+        def iterate_month(self, month: int, day: int, init_interval: int) -> tuple[int, int, int]:
+            interval = init_interval
+            # for intervals greater than a month, we go month by month
+            while (interval > self.NUM_DAYS[month-1]):
+                interval -= self.get_days_left(month, day)
+                day = 1
+                month += 1
+
+                # preventing OOB error
+                if (month >= 13):
+                    break
+
+            return month, day, interval
 
         '''
-        Iterates then returns the date string
+        :returns: Number of days left in current month
         '''
-        def get_date(self):
-            while (self.has_next):
-                self.update_day()
-                yield str(self)
+        def get_days_left(self, month: int, day: int) -> int:
+            return self.NUM_DAYS[month-1] - day + 1
+
+        '''
+        If we would go out of bounds, we do not have a next item
+        :returns: boolean representing whether we go past the end of the year
+        '''
+        def has_next(self) -> bool:
+            # try and update the day, if we go too far return false
+            month, *unused = self.perform_iteration(self.month, self.day, self.interval)
+            if (month >= 13):
+                return False
+            return True
+
+        '''
+        Iterates the day if it's within the bounds of the year and returns result
+        :returns: str representing the date (used in microwave data filename)
+        '''
+        def __next__(self) -> str:
+            # if (self.has_next):
+            #     self.month, self.day = \
+            #     self.perform_iteration(self.month, self.day, self.interval)
+            self.month, self.day = \
+            self.perform_iteration(self.month, self.day, self.interval)
+            return str(self)
 
         '''
         We use this in our loader functions
+        :returns: tuple of (month, day)
         '''
         def get_date_tuple(self) -> tuple[int, int]:
-            return self.month, self.day
+            return (self.month, self.day)
         
-        '''
-        Iterator-style fcn to determine whether we have remaining days in year
-        :returns: boolean indicating whether we can continue iteration
-        '''
-        def has_next(self) -> bool:
-            return (not(self.day == 31 and self.month == 12))
 
 
     
