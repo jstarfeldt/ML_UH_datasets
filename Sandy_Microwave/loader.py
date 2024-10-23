@@ -20,16 +20,48 @@ TODO: allow us to iterate a variable number of days per month
 '''
 
 class Microwave_Loader:
+
+    NUM_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     
     def __init__(self, month: int = 1, day: int = 1, year: int = 2023, interval: int = 1, end_date: tuple[int, int] = (12, 31)) -> None:
-        # track the current date
+        # raise error on invalid value, otherwise initialize class variables    
+        try:
+            self.check_params(month, day, year, interval, end_date)
+        except(ValueError):
+            pass
         self.month = month
         self.day = day
         self.year = year
-
-        # number of days between iteration
         self.interval = interval
         self.end_date = end_date
+
+    '''
+    Called by constructor to error on invalid values
+    :returns: boolean representing validity of constructor arguments
+    '''
+    def check_params(self, month: int, day: int, year: int, interval: int, end_date: tuple[int, int]) -> bool:
+        def invalid_mo(month: int):
+            return (month > 12 or month < 1)
+        
+        def invalid_day(month: int, day: int):
+            return (day > self.NUM_DAYS[month-1] or day < 1)
+        
+        to_return = False
+        
+        # handling month, year errors
+        if (invalid_mo(month)): 
+            raise(ValueError("Invalid month."))
+        elif(year < 2022 or year > 2023): 
+            raise(ValueError("Invalid year."))
+        elif (invalid_day(month, day)):
+            raise(ValueError("Invalid day."))
+        elif (interval > 365):
+            raise(ValueError("Invalid interval."))
+        elif (invalid_mo(end_date[0]) or invalid_day(*end_date)):
+            raise(ValueError("Invalid end date."))
+        else: 
+            to_return = True
+        return to_return  
 
     '''
     Called on init, loads up the data in the given 
@@ -42,19 +74,19 @@ class Microwave_Loader:
         print(f"initial formatted date: {filename_middle}")
         pdf = PdfPages("Microwave_Plots.pdf")
 
-        # do while loop to execute at least first day of loading data & plotting
+        # do while loop: loads & plots at least 1 day of data
         while(True):
             dataset_filename = self.get_dataset_filename(filename_middle)
             print(f"Dataset filename: {dataset_filename}")
             dataset = self.get_dataset(dataset_filename)
             self.plot_data(dataset, *year_iter.get_date_tuple(), pdf)
             
-            # need to save plot sometime
+            # once we are done iterating, stop the loop and save plots to pdf
             if (not(year_iter.has_next())):
                 pdf.close()
                 break
             
-            filename_middle: str = next(year_iter)
+            filename_middle = next(year_iter)
     
     '''
     Convert filename string into 3D microwave data
@@ -92,17 +124,20 @@ class Microwave_Loader:
         fig, (ax1, ax2) = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(12, 12), dpi=80)
         plt.subplots_adjust(wspace=0.3)
         
+        
         # start of day plot
         ax1.imshow(dataset[24].T)
         ax1.set_title(f"Morning on: {month}/{day}")
         ax1.set_xlabel("Latitude")
         ax1.set_ylabel("Longitude")
+        # plt.colorbar(label="Microwave Temp", orientation="horizontal") 
         
         # end of day plot
         ax2.imshow(dataset[72].T)
         ax2.set_title(f"Evening on: {month}/{day}")
         ax2.set_xlabel("Latitude")
         ax2.set_ylabel("Longitude")
+        # plt.colorbar(label="Microwave Temp", orientation="horizontal") 
 
         pdf.savefig()
         return fig
