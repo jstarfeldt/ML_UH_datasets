@@ -6,6 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
 from matplotlib.backends.backend_pdf import PdfPages
+from  matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 
 # not needed for now
@@ -79,7 +80,7 @@ class Microwave_Loader:
             dataset_filename = self.get_dataset_filename(filename_middle)
             print(f"Dataset filename: {dataset_filename}")
             dataset = self.get_dataset(dataset_filename)
-            self.plot_data(dataset, *year_iter.get_date_tuple(), pdf)
+            self.plot_data_single(dataset, *year_iter.get_date_tuple(), pdf)
             
             # once we are done iterating, stop the loop and save plots to pdf
             if (not(year_iter.has_next())):
@@ -111,19 +112,19 @@ class Microwave_Loader:
         filename_end = "_x1y.h5"
         return f"{filename_base}{filename_middle}{filename_end}"
 
-    '''
-    Plots our data from 2 evenly-spaced time slices (morning, evening)
+   
+    def plot_data_double(self, dataset: np.array, month: int, day: int, pdf: PdfPages) -> plt.figure:
+        '''
+            Plots our data from 2 evenly-spaced time slices (morning, evening)
 
-    :param dataset: microwave dataset as np array
-    :returns: pyplot (matplotlib) object representing the two plotted time slices
+            :param dataset: microwave dataset as np array
+            :returns: pyplot (matplotlib) object representing the two plotted time slices
 
-    TODO: make it so that we don't just have hardcoded times of day
-    '''
-    def plot_data(self, dataset: np.array, month: int, day: int, pdf: PdfPages) -> plt.figure:
+            TODO: make it so that we don't just have hardcoded times of day
+        '''
         # right now I only support 2 plots per day, evenly spaced
         fig, (ax1, ax2) = plt.subplots(1, 2, sharex=True, sharey=True, figsize=(12, 12), dpi=80)
         plt.subplots_adjust(wspace=0.3)
-        
         
         # start of day plot
         ax1.imshow(dataset[24].T)
@@ -141,6 +142,19 @@ class Microwave_Loader:
 
         pdf.savefig()
         return fig
+    
+    
+    def plot_data_single(self, dataset: np.array, month: int, day: int, pdf: PdfPages) -> plt.figure:
+        '''
+            Plots a single timeslice of the given dataset (1 day of data)
+        '''
+        fig, ax = plt.subplots()
+        plot = ax.imshow(dataset[48].T, cmap="RdYlGn_r")
+        ax.set_title(label=f"Midday on: {month}/{day}")
+        ax.set_xlabel("Latitude")
+        ax.set_ylabel("Longitude")
+        plt.colorbar(orientation="vertical", mappable=plot)
+        pdf.savefig()
 
     '''
     Handles iteration through days of the year. 
