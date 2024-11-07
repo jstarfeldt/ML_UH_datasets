@@ -14,13 +14,14 @@ import os
 import functools
 import math
 
-'''
-This class allows us to load microwave data beginning on a certain date.
-TODO: add functionality to actually plot and save to PDF
-TODO: allow us to iterate a variable number of days per month
-'''
+
 
 class Microwave_Loader:
+    '''
+        This class allows us to load microwave data beginning on a certain date.
+        TODO: see plot colorbars, range of values is a bit strange atm
+        TODO: check for missing values (see email and slack)
+    '''
 
     NUM_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     
@@ -36,11 +37,11 @@ class Microwave_Loader:
         self.interval = interval
         self.end_date = end_date
 
-    '''
-    Called by constructor to error on invalid values
-    :returns: boolean representing validity of constructor arguments
-    '''
+    
     def check_params(self, month: int, day: int, year: int, interval: int, end_date: tuple[int, int]) -> bool:
+        '''
+            Validity check for params, errors if we initialize wrong
+        '''
         def invalid_mo(month: int):
             return (month > 12 or month < 1)
         
@@ -64,11 +65,12 @@ class Microwave_Loader:
             to_return = True
         return to_return  
 
-    '''
-    Called on init, loads up the data in the given 
-    TODO: fix wrapping around with iterator (went from 2023-12-30 to 2023-04-13 with interval of 5)
-    '''
+    
     def iterate_data(self) -> None:
+        '''
+            Main function of the loader, starts on our initialized date and goes until end_date
+            Takes steps of [interval] days with each iteration, plots data and saves to PDF
+        '''
         # year iterator increments date and returns a string date to be used in filename
         year_iter = self.Year_Iterator(self.month, self.day, self.interval, self.end_date)
         filename_middle = str(year_iter)
@@ -89,24 +91,19 @@ class Microwave_Loader:
             
             filename_middle = next(year_iter)
     
-    '''
-    Convert filename string into 3D microwave data
-    
-    :param filename: string representing our full path to the microwave data file (1 day of data)
-    :returns: np array represnting our data (shape is (time slice, lat, lon))
-    '''
+   
     def get_dataset(self, filename: str) -> np.array:
+        '''
+            Extract microwave as a 3D array from given file
+        '''
         f = h5py.File(filename, 'r')
         dataset_location = "TB37V_LST_DTC"
         return np.array(f[dataset_location])
-    '''
-    Iterates through filenames by updating month, day instance vars
-    
-    :param update: whether we want to update the day (only false when we first call this)
-    :returns: str representing the next file we will process
-    '''
     
     def get_dataset_filename(self, filename_middle: str) -> str:
+        '''
+            Creates filename for Microwave Data based on the current date, given by filename_middle
+        '''
         # these two always stay the same for all files
         filename_base = f"{os.getcwd()}\\mw_lst_{str(self.year)}\\MW_LST_DTC_{str(self.year)}"
         filename_end = "_x1y.h5"
@@ -156,10 +153,11 @@ class Microwave_Loader:
         plt.colorbar(orientation="vertical", mappable=plot)
         pdf.savefig()
 
-    '''
-    Handles iteration through days of the year. 
-    '''
+    
     class Year_Iterator:
+        '''
+            Handles iteration through days of the year. 
+        '''
 
         NUM_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
         
@@ -172,10 +170,11 @@ class Microwave_Loader:
             # month, day represents our stopping date
             self.end_date = end_date
 
-        '''
-        :returns: str representing month/day with leading 0s, if necessary
-        '''
+        
         def __str__(self) -> str:
+            '''
+                :returns: str representing month/day with leading 0s, if necessary
+            '''
             # formats month, day for filename use
             def stringify_date(date: int) -> str:
                 toReturn = ""
@@ -185,20 +184,26 @@ class Microwave_Loader:
             
             return f"{stringify_date(self.month)}{stringify_date(self.day)}"
         
-        '''
-        Increments day
-
-        TODO: fix variable step for special case: step is larger than a whole month
-        '''
+        
         def perform_iteration(self, month: int, day: int, interval: int) -> tuple[int, int]:
+            '''
+                Increments our date (month, day) by [interval] number of days 
+            '''
             return self.iterate_day(*self.iterate_month(month, day, interval))
         
         def iterate_day(self, month: int, day: int, interval: int) -> tuple[int, int]:
+            '''
+                Add interval to day, return new date
+            '''
             if ((day + interval) > self.NUM_DAYS[month-1]):
                 return (month + 1, (day + interval) % self.NUM_DAYS[month-1])
             return (month, day + interval)
         
         def iterate_month(self, month: int, day: int, init_interval: int) -> tuple[int, int, int]:
+            '''
+                For increments greater than a month, this lets us iterate
+                TODO: check for bugs now that (month >= 13) check is gone
+            '''
             interval = init_interval
             # for intervals greater than a month, we go month by month
             while (interval > self.NUM_DAYS[month-1]):
@@ -206,22 +211,20 @@ class Microwave_Loader:
                 day = 1
                 month += 1
 
-                # preventing OOB error
-                if (month >= 13):
-                    break
-
             return month, day, interval
 
-        '''
-        :returns: Number of days left in current month
-        '''
+        
         def get_days_left(self, month: int, day: int) -> int:
+            '''
+                :returns: Number of days left in current month
+            '''
             return self.NUM_DAYS[month-1] - day + 1
 
-        '''
-        :returns: boolean representing whether we go past end date after one iteration
-        '''
+        
         def has_next(self) -> bool:
+            '''
+                :returns: boolean representing whether we go past end date after one iteration
+            '''
             # try and update the day, if we go too far return false
             month, day = self.perform_iteration(self.month, self.day, self.interval)
             if (self.out_of_bounds_mo(month) or self.out_of_bounds_day(month, day)):
@@ -229,28 +232,33 @@ class Microwave_Loader:
             return True
         
         def out_of_bounds_day(self, month, day) -> bool:
+            '''
+                Determines whether we are out of bounds of iteration w.r.t the end day
+            '''
             return (month == self.end_date[0] and day > self.end_date[1])
         
         def out_of_bounds_mo(self, month) -> bool:
+            '''
+                Determines whether we are out of bounds of iteration w.r.t the end month
+            '''
             return month > self.end_date[0]
 
-        '''
-        Iterates the day if it's within the bounds of the year and returns result
-        :returns: str representing the date (used in microwave data filename)
-        '''
+        
         def __next__(self) -> str:
-            # if (self.has_next):
-            #     self.month, self.day = \
-            #     self.perform_iteration(self.month, self.day, self.interval)
+            '''
+                Iterates the day and stores in instance variable date tuple
+                :returns: str representing the date (used in microwave data filename)
+            '''
             self.month, self.day = \
             self.perform_iteration(self.month, self.day, self.interval)
             return str(self)
 
-        '''
-        We use this in our loader functions
-        :returns: tuple of (month, day)
-        '''
+        
         def get_date_tuple(self) -> tuple[int, int]:
+            '''
+                We use this in our loader functions
+                :returns: tuple of (month, day)
+            '''
             return (self.month, self.day)
         
 
