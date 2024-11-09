@@ -67,7 +67,7 @@ class Microwave_Loader:
         filename_middle = str(year_iter)
        
         # load a dataframe which we use to write some important values, write the column names to CSV
-        df = pd.DataFrame(columns=["Date", "Missing", "NaN", "Hot_Temps", "Cold_Temps"])
+        df = pd.DataFrame(columns=["Date", "Min_Temp", "Max_Temp", "Hot_Temps", "Cold_Temps"])
         self.write_to_csv(df, False, True)
         # pdf = PdfPages("Microwave_Plots.pdf")
 
@@ -78,7 +78,7 @@ class Microwave_Loader:
             dataset = self.get_dataset(dataset_filename)
 
             # each dataframe is a row of important values that we write to a csv
-            df = self.get_important_values(dataset, df, (*year_iter.get_date_tuple(), self.year))
+            df = self.get_dataframe_values(dataset, (*year_iter.get_date_tuple(), self.year))
             self.write_to_csv(df)
             
             # once we are done iterating, stop the loop and save plots to pdf
@@ -87,9 +87,6 @@ class Microwave_Loader:
                 break
             
             filename_middle = next(year_iter)
-        
-        print(f"Final df\n: {df.to_string()}")
-        # self.write_to_csv(df)
    
     def get_dataset(self, filename: str) -> np.array:
         '''
@@ -108,7 +105,7 @@ class Microwave_Loader:
         filename_end = "_x1y.h5"
         return f"{filename_base}{filename_middle}{filename_end}"
     
-    def get_important_values(self, dataset: np.array, df: pd.DataFrame, date: tuple[int, int, int]) -> dict:
+    def get_dataframe_values(self, dataset: np.array, date: tuple[int, int, int]) -> pd.DataFrame:
         '''
             Testing function to see data that falls within a certain range
             Appends found values to a pandas dataframe, csv will be saved after iteration
@@ -120,8 +117,8 @@ class Microwave_Loader:
         '''
         new_df = pd.DataFrame({
             "Date": self.format_date_tuple(date),
-            "Missing": [np.count_nonzero(dataset == -9999)],
-            "NaN": [np.count_nonzero(np.isnan(dataset))],
+            "Min Temp": [np.min(dataset)],
+            "Max Temp": [np.max(dataset)],
             "Hot_Temps": [np.count_nonzero(dataset >= 20000)],
             "Cold_Temps": [np.count_nonzero(dataset <= 2500)]
         })
