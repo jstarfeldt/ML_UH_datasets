@@ -69,7 +69,7 @@ class Microwave_Loader:
         # load a dataframe which we use to write some important values, write the column names to CSV
         df = pd.DataFrame(columns=["Date", "Min_Temp", "Max_Temp", "Hot_Temps", "Cold_Temps"])
         self.write_to_csv(df, False, True)
-        # pdf = PdfPages("Microwave_Plots.pdf")
+        pdf = PdfPages("Microwave_Plots.pdf")
 
         # do while loop: loads & plots at least 1 day of data
         while(True):
@@ -77,24 +77,26 @@ class Microwave_Loader:
             dataset_filename = self.get_dataset_filename(filename_middle)
             dataset = self.get_dataset(dataset_filename)
 
+            if (plot_data): 
+                self.plot_data_single(dataset, *year_iter.get_date_tuple(), pdf)
+
             # each dataframe is a row of important values that we write to a csv
             df = self.get_dataframe_values(dataset, (*year_iter.get_date_tuple(), self.year))
             self.write_to_csv(df)
             
             # once we are done iterating, stop the loop and save plots to pdf
             if (not(year_iter.has_next())):
-                # pdf.close()
+                pdf.close()
                 break
             
             filename_middle = next(year_iter)
-   
+        
     def get_dataset(self, filename: str) -> np.array:
         '''
             Extract microwave as a 3D array from given file
         '''
         f = h5py.File(filename, 'r')
-        dataset_location = "TB37V_LST_DTC"
-        return np.array(f[dataset_location])
+        return np.array(f["TB37V_LST_DTC"])
     
     def get_dataset_filename(self, filename_middle: str) -> str:
         '''
@@ -109,20 +111,14 @@ class Microwave_Loader:
         '''
             Testing function to see data that falls within a certain range
             Appends found values to a pandas dataframe, csv will be saved after iteration
-
-            Dict element 1: number of missing values (-9999 is what Chris said)
-            Dict element 2: number of NaN values
-            Dict element 3: number of values above 20,000 (colorbars say these values exist, but I don't see them)
-            Dict element 4: number of values below 5,000 (plots show a lot of these)
         '''
-        new_df = pd.DataFrame({
+        return pd.DataFrame({
             "Date": self.format_date_tuple(date),
             "Min Temp": [np.min(dataset)],
             "Max Temp": [np.max(dataset)],
             "Hot_Temps": [np.count_nonzero(dataset >= 20000)],
             "Cold_Temps": [np.count_nonzero(dataset <= 2500)]
         })
-        return new_df
     
     def write_to_csv(self, df: pd.DataFrame, header_msg: bool = False, column_labels: bool = False) -> None:
         '''
@@ -152,7 +148,7 @@ class Microwave_Loader:
 
     def format_date_tuple(self, date: tuple[int, int, int]) -> str:
         '''
-            MM/dd/yyyy expected
+            MM/dd/yyyy tuple expected
         '''
         return f"{date[0]}/{date[1]}/{date[2]}"
   
@@ -169,12 +165,13 @@ class Microwave_Loader:
             self.month = start_month
             self.interval = interval
 
-            # month, day represents our stopping date
+            # month, day tuple represents our stopping date
             self.end_date = end_date
         
         def __str__(self) -> str:
             '''
-                :returns: str representing month/day with leading 0s, if necessary
+                Formats the current date stored by the iterator as MMdd
+                Adds leading 0s if necessary
             '''
             # formats month, day for filename use
             def stringify_date(date: int) -> str:
@@ -185,16 +182,15 @@ class Microwave_Loader:
             
             return f"{stringify_date(self.month)}{stringify_date(self.day)}"
         
-        
         def perform_iteration(self, month: int, day: int, interval: int) -> tuple[int, int]:
             '''
-                Increments our date (month, day) by [interval] number of days 
+                Increments (month, day) by [interval] number of days 
             '''
             return self.iterate_day(*self.iterate_month(month, day, interval))
         
         def iterate_day(self, month: int, day: int, interval: int) -> tuple[int, int]:
             '''
-                Add interval to day, return new date
+                Adds [interval] days, wraps around the month if necessary
             '''
             if ((day + interval) > self.NUM_DAYS[month-1]):
                 return (month + 1, (day + interval) % self.NUM_DAYS[month-1])
@@ -202,7 +198,7 @@ class Microwave_Loader:
         
         def iterate_month(self, month: int, day: int, init_interval: int) -> tuple[int, int, int]:
             '''
-                For increments greater than a month, this lets us iterate
+                Really only necessary for increments greater than the length of a month (28+ days)
                 TODO: check for bugs now that (month >= 13) check is gone
             '''
             interval = init_interval
@@ -214,51 +210,45 @@ class Microwave_Loader:
 
             return month, day, interval
 
-        
         def get_days_left(self, month: int, day: int) -> int:
             '''
-                :returns: Number of days left in current month
+                Number of days left in given month starting on given day
             '''
             return self.NUM_DAYS[month-1] - day + 1
 
-        
         def has_next(self) -> bool:
             '''
-                :returns: boolean representing whether we go past end date after one iteration
+                True if we can iterate again by [interval] days
             '''
-            # try and update the day, if we go too far return false
+            # perform a "test iteration" to see if we go out of bounds, return based on result
             month, day = self.perform_iteration(self.month, self.day, self.interval)
             if (self.out_of_bounds_mo(month) or self.out_of_bounds_day(month, day)):
                 return False
             return True
         
-        def out_of_bounds_day(self, month, day) -> bool:
+        def out_of_bounds_day(self, month: int, day: int) -> bool:
             '''
-                Determines whether we are out of bounds of iteration w.r.t the end day
+                Returns whether given day is past the end date
             '''
             return (month == self.end_date[0] and day > self.end_date[1])
         
-        def out_of_bounds_mo(self, month) -> bool:
+        def out_of_bounds_mo(self, month: int) -> bool:
             '''
-                Determines whether we are out of bounds of iteration w.r.t the end month
+                Returns whether given month is past the end date
             '''
             return month > self.end_date[0]
-
         
         def __next__(self) -> str:
             '''
-                Iterates the day and stores in instance variable date tuple
-                :returns: str representing the date (used in microwave data filename)
+                Iterates once, stores state in month, day vars
             '''
             self.month, self.day = \
             self.perform_iteration(self.month, self.day, self.interval)
             return str(self)
-
         
         def get_date_tuple(self) -> tuple[int, int]:
             '''
-                We use this in our loader functions
-                :returns: tuple of (month, day)
+                Date as a tuple for ease of access
             '''
             return (self.month, self.day)
         
