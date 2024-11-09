@@ -1,15 +1,10 @@
-# h5py stuff
 import h5py
-
-# plotting etc
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
 from matplotlib.backends.backend_pdf import PdfPages
 from  matplotlib.colors import LinearSegmentedColormap
 import numpy as np
-
-# not needed for now
 import os
 import pandas as pd
 
