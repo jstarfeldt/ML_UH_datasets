@@ -101,7 +101,8 @@ class Microwave_Loader:
             Creates filename for Microwave Data based on the current date, given by filename_middle
         '''
         # these two always stay the same for all files
-        filename_base = f"{os.getcwd()}\\mw_lst_{str(self.year)}\\MW_LST_DTC_{str(self.year)}"
+        #filename_base = f"{os.getcwd()}\\mw_lst_{str(self.year)}\\MW_LST_DTC_{str(self.year)}"
+        filename_base = f"{os.getcwd()}/mw_data/MW_LST_DTC_{str(self.year)}"
         filename_end = "_x1y.h5"
         return f"{filename_base}{filename_middle}{filename_end}"
     
@@ -135,7 +136,7 @@ class Microwave_Loader:
                 start_date_str = self.format_date_tuple((self.month, self.day, self.year))
                 end_date_str = self.format_date_tuple((self.end_date[0], self.end_date[1], self.year))
                 file.write(f"Notable values starting on: {start_date_str} and ending on: {end_date_str}")
-            df.to_csv("Microwave_Values.csv", sep="\t", mode=mode, index=False, encoding='utf-8', header=column_labels)
+            df.to_csv("Microwave_Values.csv", sep='|', mode=mode, index=False, encoding='utf-8', header=column_labels)
         file.close()
     
     def plot_data_single(self, dataset: np.array, month: int, day: int, pdf: PdfPages) -> plt.figure:
