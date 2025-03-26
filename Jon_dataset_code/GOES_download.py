@@ -73,57 +73,57 @@ city_points = {
 
 """
 Export coordinates for each urban area
-KEY: [utm zone, utm x, utm y]
+KEY: [utm zone, boolean T/F for northern/southern hemisphere, utm x, utm y]
 """
 export_coords = {
-    'DMV':[18, 292000, 4372200],
-    'NYC':[18, 562680, 4550000],
-    'Phoenix':[12, 350000, 3749000],
-    'Miami':[17, 503991, 2915332],
-    'Chicago':[16, 386195, 4680677],
-    'Denver':[13, 466349, 4442816],
-    'Seattle':[10, 504628, 5311856],
-    'San_Francisco':[10, 541523, 4206919],
-    'Los_Angeles':[11, 352871, 3803787],
-    'Atlanta':[16, 703143, 3787639],
-    'Toronto':[17, 566749, 4867878],
-    'Mexico_City':[14, 426738, 2202781],
-    'Las_Vegas':[11, 618776, 4038562],
-    'Salt_Lake_City':[12, 387959, 4539501],
-    'Dallas':[14, 639754, 3678675],
-    'Houston':[15, 221804, 3334492],
-    'New_Orleans':[15, 717043, 3335222],
-    'St_Louis':[15, 675752, 4320402],
-    'Minneapolis':[15, 433510, 5031071],
-    'Jacksonville':[17, 421321, 3375918],
-    'Charlotte':[17, 463969, 3944648],
-    'Philadelphia':[18, 445906, 4467022],
-    'San_Diego':[11, 468102, 3666860],
-    'San_Juan':[19, 732591, 2098412],
-    'Montreal':[18, 557269, 5097647],
-    'Guadalajara':[13, 621576, 2326245],
-    'Monterrey':[14, 318956, 2885247],
-    'Cancun':[16, 491502, 2369076],
-    'Billings':[12, 655301, 5109344],
-    'Guatemala_City':[15, 711929, 1659823],
-    'San_Jose':[16, 772982, 1148166],
-    'Havana':[17, 310663, 2566532],
-    'Santo_Domingo':[19, 354586, 2108039],
-    'Tegucigalpa':[16, 401921, 1598242],
-    'Managua':[16, 524987, 1386278],
-    'Panama_City':[17, 610881, 1043658],
-    'Bogota':[18, 546553, 562185],
-    'Lima':[18, 262348, 8709133],
-    'Quito':[17, 730387, 29863],
-    'Santiago':[19, 288729, 6352433],
+    'DMV':[18, True, 292000, 4372200],
+    'NYC':[18, True, 562680, 4550000],
+    'Phoenix':[12, True, 350000, 3749000],
+    'Miami':[17, True, 503991, 2915332],
+    'Chicago':[16, True, 386195, 4680677],
+    'Denver':[13, True, 466349, 4442816],
+    'Seattle':[10, True, 504628, 5311856],
+    'San_Francisco':[10, True, 541523, 4206919],
+    'Los_Angeles':[11, True, 352871, 3803787],
+    'Atlanta':[16, True, 703143, 3787639],
+    'Toronto':[17, True, 566749, 4867878],
+    'Mexico_City':[14, True, 426738, 2202781],
+    'Las_Vegas':[11, True, 618776, 4038562],
+    'Salt_Lake_City':[12, True, 387959, 4539501],
+    'Dallas':[14, True, 639754, 3678675],
+    'Houston':[15, True, 221804, 3334492],
+    'New_Orleans':[15, True, 717043, 3335222],
+    'St_Louis':[15, True, 675752, 4320402],
+    'Minneapolis':[15, True, 433510, 5031071],
+    'Jacksonville':[17, True, 421321, 3375918],
+    'Charlotte':[17, True, 463969, 3944648],
+    'Philadelphia':[18, True, 445906, 4467022],
+    'San_Diego':[11, True, 468102, 3666860],
+    'San_Juan':[19, True, 732591, 2098412],
+    'Montreal':[18, True, 557269, 5097647],
+    'Guadalajara':[13, True, 621576, 2326245],
+    'Monterrey':[14, True, 318956, 2885247],
+    'Cancun':[16, True, 491502, 2369076],
+    'Billings':[12, True, 655301, 5109344],
+    'Guatemala_City':[15, True, 711929, 1659823],
+    'San_Jose':[16, True, 772982, 1148166],
+    'Havana':[17, 310663, True, 2566532],
+    'Santo_Domingo':[19, True, 354586, 2108039],
+    'Tegucigalpa':[16, True, 401921, 1598242],
+    'Managua':[16, True, 524987, 1386278],
+    'Panama_City':[17, True, 610881, 1043658],
+    'Bogota':[18, True, 546553, 562185],
+    'Lima':[18, False, 262348, 8709133],
+    'Quito':[17, True, 730387, 29863],
+    'Santiago':[19, False, 288729, 6352433],
     'Buenos_Aires':[21, 326030, 6204959],
-    'Sao_Paulo':[23, 294104, 7446208],
-    'Manaus':[20, 762402, 9705737],
-    'Punta_Arenas':[19, 353001, 4162220],
-    'La_Paz':[19, 548109, 8213756],
-    'Montevideo':[21, 545458, 6223320],
-    'Brasilia':[22, 799612, 8288848],
-    'Caracas':[19, 686519, 1174917]
+    'Sao_Paulo':[23, False, 294104, 7446208],
+    'Manaus':[20, False, 762402, 9705737],
+    'Punta_Arenas':[19, False, 353001, 4162220],
+    'La_Paz':[19, False, 548109, 8213756],
+    'Montevideo':[21, False, 545458, 6223320],
+    'Brasilia':[22, False, 799612, 8288848],
+    'Caracas':[19, True, 686519, 1174917]
 }
 
 
@@ -209,21 +209,20 @@ if __name__ == '__main__':
     processed = GOES.map(process_GOES)
 
     # Set variable for timestamps of GOES images
-    g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/DMV/GOES/GOES_times_DMV.csv').value
+    #g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/DMV/GOES/GOES_times_DMV.csv').value
+    g_times = pd.read_csv('/Users/jonstar/Documents/heat_data/GOES_DMV/GOES_times_DMV.csv').value
 
-    # Export GOES images through http
-    crs_prefix = '326' # Northern hemisphere
-    #crs_prefix = '327' # Southern hemisphere
     #num = processed.size().getInfo()
-    num = args.n
+    num = int(args.n)
     img_list = processed.toList(num)
-    point = ee.Geometry.Point([city_export[1]+30*2999/2,city_export[2]-30*2999/2], f'EPSG:{crs_prefix}{city_export[0]}')
-    #file_prefix = f'/Users/jonstar/Documents/heat_data'
-    file_prefix = f'/home/jonstar/urban_heat_dataset/DMV/GOES'
+    file_prefix = f'/Users/jonstar/Documents/heat_data'
+    #file_prefix = f'/home/jonstar/urban_heat_dataset/DMV/GOES'
 
     indexes = np.arange(num)
     func = np.vectorize(GOES_time_to_str)
     time_strs = func(g_times[:num])
+
+    inputs = [[img_list, i, city_export, f'{file_prefix}/GOES_image_{time_str}.tif'] for i, time_str in zip(indexes,time_strs)]
     
     pool = multiprocessing.Pool(10)
     pool.starmap(getResultGOES_new, inputs)
