@@ -8,6 +8,8 @@ from data import getResultGOES_new
 import argparse
 
 ee.Initialize(project='ee-jonstar', opt_url='https://earthengine-highvolume.googleapis.com')
+#ee.Initialize(project='ee-my-mips', opt_url='https://earthengine-highvolume.googleapis.com')
+
 
 edt = pytz.timezone('US/Eastern')
 
@@ -195,7 +197,9 @@ if __name__ == '__main__':
                     prog='GOES_download',
                     description='Fast downloading for GOES images from GEE')
     parser.add_argument('--city', help='String of city from list of valid cities to make data for')
-    parser.add_argument('--n', help='Number of files to create')
+    parser.add_argument('--n', nargs='?', const=105120, help='Number of files to create')
+    parser.add_argument('--startFile', nargs='?', const=0, help='File index to start from')
+    parser.add_argument('--cpus', nargs='?', const=100, help='Number of CPU cores to run in parallel')
     args = parser.parse_args()
     
     # Pull points to make data for a specific city (look above for options)
@@ -209,22 +213,39 @@ if __name__ == '__main__':
     processed = GOES.map(process_GOES)
 
     # Set variable for timestamps of GOES images
-    #g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/DMV/GOES/GOES_times_DMV.csv').value
-    g_times = pd.read_csv('/Users/jonstar/Documents/heat_data/GOES_DMV/GOES_times_DMV.csv').value
+    g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/GOES_times.csv').value
+    #g_times = pd.read_csv('/Users/jonstar/Documents/heat_data/GOES_DMV/GOES_times_DMV.csv').value
 
-    #num = processed.size().getInfo()
     num = int(args.n)
-    img_list = processed.toList(num)
-    file_prefix = f'/Users/jonstar/Documents/heat_data'
-    #file_prefix = f'/home/jonstar/urban_heat_dataset/DMV/GOES'
+    start = int(args.startFile)
+    if num > 105120: # Largest number of files is length of processed list
+        num = processed.size().getInfo()
+    img_list = processed.toList(num, start)
+    #file_prefix = f'/Users/jonstar/Documents/heat_data'
+    if start < 30000:
+        file_prefix = f'/home/jonstar/urban_heat_dataset/{city}/GOES'
+    else:
+        file_prefix = f'/home/jonstar/urban_heat_dataset/{city}/GOES2'
 
     indexes = np.arange(num)
     func = np.vectorize(GOES_time_to_str)
-    time_strs = func(g_times[:num])
+    time_strs = func(g_times[start:start+num])
 
-    inputs = [[img_list, i, city_export, f'{file_prefix}/GOES_image_{time_str}.tif'] for i, time_str in zip(indexes,time_strs)]
-    
-    pool = multiprocessing.Pool(10)
+    if city_export[1]:
+        crs_prefix = '326' # Northern hemisphere
+    else:
+        crs_prefix = '327' # Southern hemisphere
+
+    crs = f'EPSG:{crs_prefix}{city_export[0]}'
+    point = ee.Geometry.Point([city_export[2]+30*2999/2,city_export[3]-30*2999/2], crs)
+    region = point.buffer(distance=44000, proj=crs).bounds(proj=crs)
+
+    inputs = [[ee.Image(img_list.get(int(i))), region, crs, f'{file_prefix}/GOES_image_{time_str}.tif'] for i, time_str in zip(indexes,time_strs)]
+
+    print('Starting multiprocessing')
+
+    nCPUs = int(args.cpus)
+    pool = multiprocessing.Pool(nCPUs)
     pool.starmap(getResultGOES_new, inputs)
     pool.close()
     pool.join()
