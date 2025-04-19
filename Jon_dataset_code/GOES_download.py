@@ -6,6 +6,7 @@ import pytz
 import multiprocessing
 from data import getResultGOES_new
 import argparse
+import subprocess
 
 ee.Initialize(project='ee-jonstar', opt_url='https://earthengine-highvolume.googleapis.com')
 #ee.Initialize(project='ee-my-mips', opt_url='https://earthengine-highvolume.googleapis.com')
@@ -118,7 +119,7 @@ export_coords = {
     'Lima':[18, False, 262348, 8709133],
     'Quito':[17, True, 730387, 29863],
     'Santiago':[19, False, 288729, 6352433],
-    'Buenos_Aires':[21, 326030, 6204959],
+    'Buenos_Aires':[21, False, 326030, 6204959],
     'Sao_Paulo':[23, False, 294104, 7446208],
     'Manaus':[20, False, 762402, 9705737],
     'Punta_Arenas':[19, False, 353001, 4162220],
@@ -127,26 +128,6 @@ export_coords = {
     'Brasilia':[22, False, 799612, 8288848],
     'Caracas':[19, True, 686519, 1174917]
 }
-
-
-"""
-Convert datetimes from your current timezone to a desired timezone.
-
-dt (datetime): python datetime object
-to_timezone (pytz timezone): timezone to convert to
-local_timezone (pytz timezone): the timezone you are currently in. Python uses your computer's internal clock, so whatever your computer is on.
-"""
-def toTimezone(dt, to_timezone, local_timezone=edt):
-    return local_timezone.normalize(local_timezone.localize(dt)).astimezone(to_timezone)
-
-
-"""
-Converts unix timestamp to YearMonthDayHourMinute date string.
-
-timestamp (int): unix timetamp in microseconds
-"""
-def GOES_time_to_str(timestamp):
-    return toTimezone(datetime.fromtimestamp(timestamp/1000), pytz.utc).strftime('%Y%m%d%H%M')
 
 
 """
@@ -209,11 +190,16 @@ if __name__ == '__main__':
     city_export = export_coords[city]
 
     # Initialize GOES ImageCollection and process the images
-    GOES = ee.ImageCollection("NOAA/GOES/16/MCMIPF").filterDate('2022-01-01', '2024-01-01')
+    if city in ['Seattle', 'San_Francisco', 'Los_Angeles', 'San_Diego', 'Phoenix', 'Las_Vegas', 'Salt_Lake_City']:
+        GOES1 = ee.ImageCollection("NOAA/GOES/17/MCMIPF").filterDate('2022-01-01', '2023-01-04')
+        GOES2 = ee.ImageCollection("NOAA/GOES/18/MCMIPF").filterDate('2023-01-04', '2024-01-01')
+        GOES = GOES1.merge(GOES2)
+    else:
+        GOES = ee.ImageCollection("NOAA/GOES/16/MCMIPF").filterDate('2022-01-01', '2024-01-01')
     processed = GOES.map(process_GOES)
 
     # Set variable for timestamps of GOES images
-    g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/GOES_times.csv').value
+    g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/GOES_times.csv')
     #g_times = pd.read_csv('/Users/jonstar/Documents/heat_data/GOES_DMV/GOES_times_DMV.csv').value
 
     num = int(args.n)
@@ -221,15 +207,17 @@ if __name__ == '__main__':
     if num > 105120: # Largest number of files is length of processed list
         num = processed.size().getInfo()
     img_list = processed.toList(num, start)
+
     #file_prefix = f'/Users/jonstar/Documents/heat_data'
     if start < 30000:
+        subprocess.call(['mkdir', '-p', f'/home/jonstar/urban_heat_dataset/{city}/GOES'])
         file_prefix = f'/home/jonstar/urban_heat_dataset/{city}/GOES'
     else:
+        subprocess.call(['mkdir', '-p', f'/home/jonstar/urban_heat_dataset/{city}/GOES2'])
         file_prefix = f'/home/jonstar/urban_heat_dataset/{city}/GOES2'
-
+    
     indexes = np.arange(num)
-    func = np.vectorize(GOES_time_to_str)
-    time_strs = func(g_times[start:start+num])
+    time_strs = g_times.datetime[start:start+num]
 
     if city_export[1]:
         crs_prefix = '326' # Northern hemisphere
@@ -244,8 +232,12 @@ if __name__ == '__main__':
 
     print('Starting multiprocessing')
 
+    start = datetime.now()
     nCPUs = int(args.cpus)
     pool = multiprocessing.Pool(nCPUs)
     pool.starmap(getResultGOES_new, inputs)
     pool.close()
     pool.join()
+
+    time_diff = datetime.now() - start
+    print(f'Total time: {time_diff.total_seconds()} seconds')

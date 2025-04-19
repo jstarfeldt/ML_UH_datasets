@@ -30,7 +30,7 @@ def getResultGOES_new(image, region, crs, filename, verbose=False):
     # Handle downloading the actual pixels.
     r = requests.get(url, stream=True)
     if r.status_code != 200:
-        print('Unsuccessful request')
+        #print('Unsuccessful request')
         raise r.raise_for_status()
     #print('request successful')
 
