@@ -10,7 +10,6 @@ import logging
 from retry import retry
 
 ee.Initialize(project='ee-jonstar', opt_url='https://earthengine-highvolume.googleapis.com')
-#ee.Initialize(project='ee-my-mips', opt_url='https://earthengine-highvolume.googleapis.com')
 
 
 """
@@ -37,21 +36,21 @@ export_coords = {
     'New_Orleans':[15, True, 723933, 3361201],
     'St_Louis':[15, True, 675752, 4320402],
     'Minneapolis':[15, True, 433510, 5031071],
-    'Jacksonville':[17, True, 415951, 3376291],
+    'Jacksonville':[17, True, 401561, 3376745],
     'Charlotte':[17, True, 472912, 3938294],
     'Philadelphia':[18, True, 445926, 4469797],
     'San_Diego':[11, True, 468102, 3666860],
-    'San_Juan':[19, True, 732591, 2098412],
+    'San_Juan':[19, True, 732184, 2071833],
     'Montreal':[18, True, 563054, 5091925],
     'Guadalajara':[13, True, 621576, 2326245],
     'Monterrey':[14, True, 318956, 2885247],
-    'Cancun':[16, True, 491502, 2369076],
+    'Cancun':[16, True, 470776, 2369100],
     'Billings':[12, True, 655301, 5109344],
     'Guatemala_City':[15, True, 711929, 1659823],
     'San_Jose':[16, True, 772982, 1148166],
     'Havana':[17, True, 310663, 2566532],
     'Santo_Domingo':[19, True, 354586, 2108039],
-    'Tegucigalpa':[16, True, 401921, 1598242],
+    'Tegucigalpa':[16, True, 405975, 1615482],
     'Managua':[16, True, 524987, 1386278],
     'Panama_City':[17, True, 610881, 1043658],
     'Bogota':[18, True, 546553, 562185],
@@ -64,8 +63,8 @@ export_coords = {
     'Punta_Arenas':[19, False, 325613, 4159646],
     'La_Paz':[19, False, 548109, 8213756],
     'Montevideo':[21, False, 545458, 6223320],
-    'Brasilia':[22, False, 799612, 8288848],
-    'Caracas':[19, True, 686519, 1174917]
+    'Brasilia':[22, False, 783269, 8287283],
+    'Caracas':[19, True, 687497, 1176029]
 }
 
 
