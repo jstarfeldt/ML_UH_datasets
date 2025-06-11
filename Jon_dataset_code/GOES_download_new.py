@@ -18,7 +18,7 @@ KEY: [utm zone, boolean T/F for northern/southern hemisphere, utm x, utm y]
 """
 export_coords = {
     'DMV':[18, True, 292000, 4372200],
-    'NYC':[18, True, 560745, 4536122],
+    'NYC':[18, True, 561166, 4546228],
     'Phoenix':[12, True, 356592, 3758141],
     'Miami':[17, True, 503991, 2915332],
     'Chicago':[16, True, 386195, 4680677],
