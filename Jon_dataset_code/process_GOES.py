@@ -39,7 +39,7 @@ Attributes:
     tif (str): Path where tif file is located.
     time (str): Date and time of when the data was collected format YYYY-MM-DDThh:mm:ssZ.
     latlon_pts (float array): (45,45,2) Array of (longitude, latitude) points at each point on the utm grid.
-    local_timezone (pytz timezone): Local timezone of the area you are creating data for
+    fname (str): Full path of where to store the file, including a filename ending in '.nc'.
     coord_bounds (tuple or list, optional): Coordinate bounds if you wish to filter the data by location. Order should be
                                     (longitude minimum, longitude maximum, latitude minimum, latitude maximum).
 """
@@ -48,29 +48,63 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
     # Open file and rename variables
     dsG = rxr.open_rasterio(tif)
     geotiff_ds = dsG.to_dataset('band')
-
     geotiff_ds = geotiff_ds.rename({1:'GOES_C13_LWIR', 2:'GOES_C14_LWIR',
                                       3:'GOES_C15_LWIR', 4:'GOES_C16_LWIR'})
-
     geotiff_ds = geotiff_ds.assign_coords({'datetime':time})
 
     #########################################################################################################
     # Process microwave data
+    """
+    Returns the value rounded up or down to the nearest 0.25.
+
+    Attributes:
+        n (float): latitude or longitude coordinate.
+        above (boolean): True for round up, False for round down.
+    """
+    def get_next_latlon_coord(n, above=True):
+        if above:
+            return np.ceil(n*4)/4
+        else:
+            return np.floor(n*4)/4
+
+    """
+    Returns an integer as a str, adding a zero in front if it is a single digit.
+
+    Attributes:
+        num (int): Integer to turn into a string.
+    """
     def stringify(num):
         if num >= 0 and num < 10:
             return f'0{num}'
         else:
-            return num
+            return str(num)
 
+    
     longitude = latlon_pts[22,22,0]
     
     date_format = "%Y-%m-%dT%H:%M:%SZ"
     utc_dt = datetime.datetime.strptime(time, date_format)
     local_dt = utc_dt + datetime.timedelta(hours=(longitude/360)*24)
     date_str = f'{local_dt.year}{stringify(local_dt.month)}{stringify(local_dt.day)}'
-    time_index = local_dt.hour*4 + round(local_dt.minute/15+local_dt.second/3600) # Used in selection of datetime index from mw file (every 15 minutes)
+
+    """
+    Adjusts a datetime in UTC to local time based on how far it is from the Prime Meridian and
+    calculates an index 0-95 of which 15-minute interval the time is in a day.
+
+    Attributes:
+        longitude (float): Longitude value.
+        dt (python datetime object): Datetime with a time in UTC.
+    """
+    def time_adjust(longitude, dt=utc_dt):
+        local_dt = dt + datetime.timedelta(hours=(longitude/360)*24) # Adjusting for global local time
+        time_index = local_dt.hour*4 + round(local_dt.minute/15+local_dt.second/3600) # Used in selection of datetime index from mw file (every 15 minutes)
+        return time_index
+
+    func = np.vectorize(time_adjust)
+    time_indices = func(latlon_pts[:,:,0])
     
-    dsMW = xr.open_dataset(f'/afs/shell.umd.edu/project/gcurbanheat/shared/urban_heat_dataset/mw_data/MW_LST_DTC_{date_str}_x1y.h5')
+    dsMW = xr.open_dataset(f'/home/jonstar/scratch.gcurbanheat/mw_data/MW_LST_DTC_{date_str}_x1y.h5', 
+                          engine='h5netcdf')
     dsMW = dsMW.assign_coords(
                 datetime=("phony_dim_0", pd.date_range(start=date_str, periods=96, freq="15min")),
                 longitude=("phony_dim_1", np.arange(-180,180,0.25)),
@@ -84,12 +118,21 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
 
     # Create microwave array for specific area
     # Remember: latitude decreases with index
-    mw_clipped = dsMW['TB37V_LST_DTC'][time_index,min_lon_index:max_lon_index+1,max_lat_index:min_lat_index+1]
+    mw_clipped = dsMW['TB37V_LST_DTC'][np.min(time_indices):np.max(time_indices)+1,min_lon_index:max_lon_index+1,max_lat_index:min_lat_index+1]
 
     y, x = np.meshgrid(mw_clipped['latitude'], mw_clipped['longitude'])
     mw_latlons = np.stack((x,y)).T.reshape(-1,2)
-    mw_vals = mw_clipped.T.values.reshape(-1)
-    mw_interpolated = interpolate.griddata(mw_latlons, mw_vals, latlon_pts, method='nearest')
+
+    interpolated_arrays = []
+    for arr in mw_clipped:
+        mw_interpolated = interpolate.griddata(mw_latlons, arr.T.values.reshape(-1)/50, latlon_pts, method='nearest')
+        interpolated_arrays.append(mw_interpolated)
+    interpolated_array = np.stack(interpolated_arrays) # Interpolated microwave values from each time index n of shape (n,45,45)
+    interpolated_indices = time_indices-np.min(time_indices) # Array of shape (45,45) that select time indices from the value array
+    
+    # Index the first dimension of the value array
+    mw_interpolated = interpolated_array[interpolated_indices, np.arange(45)[:, None], np.arange(45)]
+
     geotiff_ds['microwave_LST'] = (('y','x'), mw_interpolated)
 
     # Flip coordinates so latitude increases with index
