@@ -80,12 +80,15 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
             return str(num)
 
     
-    longitude = latlon_pts[22,22,0]
-    
+    min_longitude = np.min(latlon_pts[:,:,0])
+    max_longitude = np.max(latlon_pts[:,:,0])
+
     date_format = "%Y-%m-%dT%H:%M:%SZ"
     utc_dt = datetime.datetime.strptime(time, date_format)
-    local_dt = utc_dt + datetime.timedelta(hours=(longitude/360)*24)
-    date_str = f'{local_dt.year}{stringify(local_dt.month)}{stringify(local_dt.day)}'
+    local_dt1 = utc_dt + datetime.timedelta(hours=(min_longitude/360)*24)
+    date_str1 = f'{local_dt1.year}{stringify(local_dt1.month)}{stringify(local_dt1.day)}'
+    local_dt2 = utc_dt + datetime.timedelta(hours=(max_longitude/360)*24)
+    date_str2 = f'{local_dt2.year}{stringify(local_dt2.month)}{stringify(local_dt2.day)}'
 
     """
     Adjusts a datetime in UTC to local time based on how far it is from the Prime Meridian and
@@ -102,14 +105,35 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
 
     func = np.vectorize(time_adjust)
     time_indices = func(latlon_pts[:,:,0])
+
+    if np.sum(time_indices<96) < 2025: # Accounting for rounding of values to timestep of following day
+        date_str2 = str(int(date_str2)+1)
+
+    if date_str1 != date_str2: # When data spans two days (two different files)
+        dsMW = xr.open_dataset(f'/home/jonstar/scratch.gcurbanheat/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
+        dsMW = dsMW.assign_coords(
+            datetime=("phony_dim_0", pd.date_range(start=date_str1, periods=96, freq="15min")),
+            longitude=("phony_dim_1", np.arange(-180,180,0.25)),
+            latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))
+
+        
+        dsMW2 = xr.open_dataset(f'/home/jonstar/scratch.gcurbanheat/mw_data/MW_LST_DTC_{date_str2}_x1y.h5', engine='h5netcdf')
+        dsMW2 = dsMW.assign_coords(
+            datetime=("phony_dim_0", pd.date_range(start=date_str2, periods=96, freq="15min")),
+            longitude=("phony_dim_1", np.arange(-180,180,0.25)),
+            latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))
     
-    dsMW = xr.open_dataset(f'/home/jonstar/scratch.gcurbanheat/mw_data/MW_LST_DTC_{date_str}_x1y.h5', 
-                          engine='h5netcdf')
-    dsMW = dsMW.assign_coords(
-                datetime=("phony_dim_0", pd.date_range(start=date_str, periods=96, freq="15min")),
-                longitude=("phony_dim_1", np.arange(-180,180,0.25)),
-                latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))
-    #dsMW = dsMW.rename({'phony_dim_0':'datetime', 'phony_dim_1':'longitude', 'phony_dim_2':'latitude'})
+
+        dsMW = xr.concat([dsMW.to_dataarray()[0], dsMW2.to_dataarray()[0]], dim='phony_dim_0') # Concatenate arrays to be continuous
+
+        time_indices = np.where(time_indices>90, time_indices, time_indices+96) # Adjust time indices to be in continuous order
+    else:
+        dsMW = xr.open_dataset(f'/home/jonstar/scratch.gcurbanheat/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
+        dsMW = dsMW.assign_coords(
+            datetime=("phony_dim_0", pd.date_range(start=date_str1, periods=96, freq="15min")),
+            longitude=("phony_dim_1", np.arange(-180,180,0.25)),
+            latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))
+
 
     max_lon_index = np.where(dsMW['longitude'] == get_next_latlon_coord(np.max(latlon_pts[:,:,0]), True))[0][0]
     min_lon_index = np.where(dsMW['longitude'] == get_next_latlon_coord(np.min(latlon_pts[:,:,0]), False))[0][0]
@@ -118,7 +142,10 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
 
     # Create microwave array for specific area
     # Remember: latitude decreases with index
-    mw_clipped = dsMW['TB37V_LST_DTC'][np.min(time_indices):np.max(time_indices)+1,min_lon_index:max_lon_index+1,max_lat_index:min_lat_index+1]
+    if date_str1 != date_str2: # Concatenation removes TB37V_LST_DTC variable
+        mw_clipped = dsMW[np.min(time_indices):np.max(time_indices)+1,min_lon_index:max_lon_index+1,max_lat_index:min_lat_index+1]
+    else:
+        mw_clipped = dsMW['TB37V_LST_DTC'][np.min(time_indices):np.max(time_indices)+1,min_lon_index:max_lon_index+1,max_lat_index:min_lat_index+1]
 
     y, x = np.meshgrid(mw_clipped['latitude'], mw_clipped['longitude'])
     mw_latlons = np.stack((x,y)).T.reshape(-1,2)
