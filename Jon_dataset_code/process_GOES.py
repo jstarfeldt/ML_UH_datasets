@@ -90,9 +90,12 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
     local_dt2 = utc_dt + datetime.timedelta(hours=(max_longitude/360)*24)
     date_str2 = f'{local_dt2.year}{stringify(local_dt2.month)}{stringify(local_dt2.day)}'
 
+    if date_str1 == '20211231':
+        return
+
     """
     Adjusts a datetime in UTC to local time based on how far it is from the Prime Meridian and
-    calculates an index 0-95 of which 15-minute interval the time is in a day.
+    calculates an index 0-96 of which 15-minute interval the time is in a day.
 
     Attributes:
         longitude (float): Longitude value.
@@ -107,7 +110,8 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
     time_indices = func(latlon_pts[:,:,0])
 
     if np.sum(time_indices<96) < 2025: # Accounting for rounding of values to timestep of following day
-        date_str2 = str(int(date_str2)+1)
+        local_dt2 = local_dt2 + datetime.timedelta(days=1)
+        date_str2 = f'{local_dt2.year}{stringify(local_dt2.month)}{stringify(local_dt2.day)}'
 
     if date_str1 != date_str2: # When data spans two days (two different files)
         dsMW = xr.open_dataset(f'/home/jonstar/scratch.gcurbanheat/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
