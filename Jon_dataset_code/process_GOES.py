@@ -10,6 +10,9 @@ from scipy import interpolate
 import multiprocessing
 import argparse
 import subprocess
+import warnings
+
+warnings.filterwarnings("ignore")
 
 
 """
@@ -90,7 +93,7 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
     local_dt2 = utc_dt + datetime.timedelta(hours=(max_longitude/360)*24)
     date_str2 = f'{local_dt2.year}{stringify(local_dt2.month)}{stringify(local_dt2.day)}'
 
-    if date_str1 == '20211231':
+    if date_str1 == '20211231' or date_str2 == '20211231' or date_str1 == '20220322' or date_str2 == '20220322':
         return
 
     """
@@ -183,17 +186,22 @@ if __name__ == '__main__':
                     prog='GOES_download',
                     description='Fast downloading for GOES images from GEE')
     parser.add_argument('--city', help='String of city from list of valid cities to make data for')
-    parser.add_argument('--cpus', nargs='?', const=30, help='Number of CPU cores to run in parallel')
+    parser.add_argument('--cpus', nargs='?', const=32, help='Number of CPU cores to run in parallel')
     args = parser.parse_args()
     
     # Pull points to make data for a specific city (look above for options)
-    #city = 'DMV'
     city = args.city
     city_zone = proj_zone[city]
-    utm_proj = Proj(proj="utm", zone=city_zone[0], datum="WGS84", northern=city_zone[1])
+    #utm_proj = Proj(proj="utm", zone=city_zone[0], datum="WGS84", northern=city_zone[1])
+    if city_zone[1]:
+        crs_prefix = '326'
+    else:
+        crs_prefix = '327'
+    proj_code = f'EPSG:{crs_prefix}{city_zone[0]}'
+    utm_proj = Proj(projparams=proj_code)
 
     # Ensure there is a GOES directory made for the city and set it as the prefix to the filename
-    processed_dir = f'/home/jonstar/urban_heat_dataset/{city}/processed_GOES'
+    processed_dir = f'/home/jonstar/scratch.gcurbanheat/processed_GOES_{city}'
     subprocess.call(['mkdir', '-p', processed_dir])
    
     if city in ['Seattle', 'San_Francisco', 'Los_Angeles', 'San_Diego', 'Phoenix', 'Las_Vegas', 'Salt_Lake_City']:
@@ -204,8 +212,7 @@ if __name__ == '__main__':
     def sort_func_GOES(s):
         return int(s.split('image_')[1].split('.tif')[0])
 
-    GOES_tif_list = glob.glob(f'/home/jonstar/urban_heat_dataset/{city}/GOES/*.tif')
-    GOES_tif_list = sorted(GOES_tif_list, key=sort_func_GOES)
+    GOES_tif_list = sorted(glob.glob(f'/home/jonstar/scratch.gcurbanheat/{city}_GOES/*.tif'), key=sort_func_GOES)
 
     dsG = rxr.open_rasterio(GOES_tif_list[0])
     geotiff_dsG = dsG.to_dataset('band')
@@ -220,8 +227,7 @@ if __name__ == '__main__':
     latlon_pts_2km = latlon_pts_2km_1d.reshape((45,45,2))
 
     file_index = np.arange(len(GOES_tif_list))
-    processed_dir = f'/home/jonstar/urban_heat_dataset/{city}/processed_GOES'
-    inputs = [[GOES_tif_list[i], datetime.datetime.fromtimestamp(g_times[i]/1000, datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'), latlon_pts_2km, f'{processed_dir}/{GOES_tif_list[i].split('/')[-1].split('.')[0]}.nc'] for i in file_index]
+    inputs = [[GOES_tif_list[i], datetime.datetime.fromtimestamp(g_times[i]/1000, datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'), latlon_pts_2km, f'{processed_dir}/{city}_{GOES_tif_list[i].split('/')[-1].split('.')[0]}.nc'] for i in file_index]
 
     print('Starting multiprocessing')
 
