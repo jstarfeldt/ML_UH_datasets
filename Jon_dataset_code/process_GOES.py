@@ -10,9 +10,7 @@ from scipy import interpolate
 import multiprocessing
 import argparse
 import subprocess
-import warnings
 
-warnings.filterwarnings("ignore")
 
 
 """
@@ -82,7 +80,8 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
         else:
             return str(num)
 
-    
+    # Calculate adjusted datetimes for the left and right edges of the image.
+    # If the datetimes are across two days, values from two mw LST files need to be used.
     min_longitude = np.min(latlon_pts[:,:,0])
     max_longitude = np.max(latlon_pts[:,:,0])
 
@@ -93,8 +92,6 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
     local_dt2 = utc_dt + datetime.timedelta(hours=(max_longitude/360)*24)
     date_str2 = f'{local_dt2.year}{stringify(local_dt2.month)}{stringify(local_dt2.day)}'
 
-    if date_str1 == '20211231' or date_str2 == '20211231' or date_str1 == '20220322' or date_str2 == '20220322':
-        return
 
     """
     Adjusts a datetime in UTC to local time based on how far it is from the Prime Meridian and
@@ -112,30 +109,33 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
     func = np.vectorize(time_adjust)
     time_indices = func(latlon_pts[:,:,0])
 
-    if np.sum(time_indices<96) < 2025: # Accounting for rounding of values to timestep of following day
+    # Accounting for rounding of values to timestep of following day
+    if np.sum(time_indices<96) < 2025: 
         local_dt2 = local_dt2 + datetime.timedelta(days=1)
         date_str2 = f'{local_dt2.year}{stringify(local_dt2.month)}{stringify(local_dt2.day)}'
 
+    # Accounting for files we do not have currently
+    if date_str1 == '20211231' or date_str2 == '20211231' or date_str1 == '20220322' or date_str2 == '20220322':
+        print('date string identifited')
+        return
+
     if date_str1 != date_str2: # When data spans two days (two different files)
-        dsMW = xr.open_dataset(f'/home/jonstar/scratch.gcurbanheat/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
+        dsMW = xr.open_dataset(f'/scratch/zt1/project/gcurbanheat/user/jonstar/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
         dsMW = dsMW.assign_coords(
             datetime=("phony_dim_0", pd.date_range(start=date_str1, periods=96, freq="15min")),
             longitude=("phony_dim_1", np.arange(-180,180,0.25)),
             latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))
-
-        
-        dsMW2 = xr.open_dataset(f'/home/jonstar/scratch.gcurbanheat/mw_data/MW_LST_DTC_{date_str2}_x1y.h5', engine='h5netcdf')
+ 
+        dsMW2 = xr.open_dataset(f'/scratch/zt1/project/gcurbanheat/user/jonstar/mw_data/MW_LST_DTC_{date_str2}_x1y.h5', engine='h5netcdf')
         dsMW2 = dsMW.assign_coords(
             datetime=("phony_dim_0", pd.date_range(start=date_str2, periods=96, freq="15min")),
             longitude=("phony_dim_1", np.arange(-180,180,0.25)),
-            latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))
-    
+            latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))    
 
         dsMW = xr.concat([dsMW.to_dataarray()[0], dsMW2.to_dataarray()[0]], dim='phony_dim_0') # Concatenate arrays to be continuous
-
         time_indices = np.where(time_indices>90, time_indices, time_indices+96) # Adjust time indices to be in continuous order
     else:
-        dsMW = xr.open_dataset(f'/home/jonstar/scratch.gcurbanheat/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
+        dsMW = xr.open_dataset(f'/scratch/zt1/project/gcurbanheat/user/jonstar/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
         dsMW = dsMW.assign_coords(
             datetime=("phony_dim_0", pd.date_range(start=date_str1, periods=96, freq="15min")),
             longitude=("phony_dim_1", np.arange(-180,180,0.25)),
@@ -151,8 +151,11 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
     # Remember: latitude decreases with index
     if date_str1 != date_str2: # Concatenation removes TB37V_LST_DTC variable
         mw_clipped = dsMW[np.min(time_indices):np.max(time_indices)+1,min_lon_index:max_lon_index+1,max_lat_index:min_lat_index+1]
+        dsMW.close()
+        dsMW2.close()
     else:
         mw_clipped = dsMW['TB37V_LST_DTC'][np.min(time_indices):np.max(time_indices)+1,min_lon_index:max_lon_index+1,max_lat_index:min_lat_index+1]
+        dsMW.close()
 
     y, x = np.meshgrid(mw_clipped['latitude'], mw_clipped['longitude'])
     mw_latlons = np.stack((x,y)).T.reshape(-1,2)
@@ -178,7 +181,11 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
         geotiff_ds = geotiff_ds.sel(longitude=slice(coord_bounds[0], coord_bounds[1])).sel(latitude=slice(coord_bounds[3], coord_bounds[2]))
 
     #########################################################################################################
-    geotiff_ds.to_netcdf(fname)
+    #try:
+    geotiff_ds.to_netcdf(fname, format='NETCDF4', engine='h5netcdf')
+    #except PermissionError:
+    #    print('Excepted')
+    #    return
 
 
 if __name__ == '__main__':
@@ -187,6 +194,7 @@ if __name__ == '__main__':
                     description='Fast downloading for GOES images from GEE')
     parser.add_argument('--city', help='String of city from list of valid cities to make data for')
     parser.add_argument('--cpus', nargs='?', const=32, help='Number of CPU cores to run in parallel')
+    parser.add_argument('--section', nargs=1, help='Section of GOES files to process')
     args = parser.parse_args()
     
     # Pull points to make data for a specific city (look above for options)
@@ -200,20 +208,45 @@ if __name__ == '__main__':
     proj_code = f'EPSG:{crs_prefix}{city_zone[0]}'
     utm_proj = Proj(projparams=proj_code)
 
-    # Ensure there is a GOES directory made for the city and set it as the prefix to the filename
-    processed_dir = f'/home/jonstar/scratch.gcurbanheat/processed_GOES_{city}'
-    subprocess.call(['mkdir', '-p', processed_dir])
-   
     if city in ['Seattle', 'San_Francisco', 'Los_Angeles', 'San_Diego', 'Phoenix', 'Las_Vegas', 'Salt_Lake_City']:
+        GOES_west = True
+    else:
+        GOES_west = False
+   
+    if GOES_west:
         g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/GOES_West_times.csv').value
+        indices = [25268, 50775, 76786, 103146]
     else:
         g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/GOES_East_times.csv').value
+        indices = [25994, 52337, 78338, 104730]
+
+
+    # Ensure there is a GOES directory made for the city and set it as the prefix to the filename
+    section = int(args.section[0])
+    if section == 1:
+        suffix = '2022_1'
+        start = 0
+        end = indices[0]
+    elif section == 2:
+        suffix = '2022_2'
+        start = indices[0]
+        end = indices[1]
+    elif section == 3:
+        suffix = '2023_1'
+        start = indices[1]
+        end = indices[2]
+    else:
+        suffix = '2023_2'
+        start = indices[2]
+        end = indices[3]
+    processed_dir = f'/scratch/zt1/project/mjmolina-prj/user/jonstar/processed_GOES_{city}_{suffix}'
+    subprocess.call(['mkdir', '-p', processed_dir])
+
 
     def sort_func_GOES(s):
         return int(s.split('image_')[1].split('.tif')[0])
 
-    GOES_tif_list = sorted(glob.glob(f'/home/jonstar/scratch.gcurbanheat/{city}_GOES/*.tif'), key=sort_func_GOES)
-
+    GOES_tif_list = sorted(glob.glob(f'/scratch/zt1/project/gcurbanheat/user/jonstar/{city}_GOES/*.tif'), key=sort_func_GOES)
     dsG = rxr.open_rasterio(GOES_tif_list[0])
     geotiff_dsG = dsG.to_dataset('band')
 
@@ -226,10 +259,14 @@ if __name__ == '__main__':
     latlon_pts_2km_1d = np.array(list(map(stacked_to_latlon, utm_coords)))
     latlon_pts_2km = latlon_pts_2km_1d.reshape((45,45,2))
 
-    file_index = np.arange(len(GOES_tif_list))
+    # Close opened datasets
+    dsG.close()
+    geotiff_dsG.close()
+
+    file_index = np.arange(start, end)
     inputs = [[GOES_tif_list[i], datetime.datetime.fromtimestamp(g_times[i]/1000, datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'), latlon_pts_2km, f'{processed_dir}/{city}_{GOES_tif_list[i].split('/')[-1].split('.')[0]}.nc'] for i in file_index]
 
-    print('Starting multiprocessing')
+    #print('Starting multiprocessing')
 
     start = datetime.datetime.now()
     nCPUs = int(args.cpus)
