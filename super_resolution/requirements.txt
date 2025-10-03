@@ -1,8 +1,0 @@
-numpy
-xarray
-torch
-torchvision
-torchaudio
-pandas
-matplotlib
-seaborn
