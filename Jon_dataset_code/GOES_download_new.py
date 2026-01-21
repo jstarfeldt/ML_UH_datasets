@@ -75,9 +75,13 @@ image (ee.Image): GOES image to scale and offset.
 """
 def scale_and_offset_GOES(image):
     #reflectances = image.select(['CMI_C01', 'CMI_C02', 'CMI_C03', 'CMI_C05', 'CMI_C06']).multiply(0.0002442)
-    weight = 0.039316241
-    bias = 173.14999
-    brightness_temps = image.select(['CMI_C13', 'CMI_C14', 'CMI_C15', 'CMI_C16']).multiply(weight).add(bias)
+    im = image.select(['CMI_C13', 'CMI_C14', 'CMI_C15', 'CMI_C16'])
+    scales = image.toDictionary(['CMI_C13_scale', 'CMI_C14_scale', 'CMI_C15_scale', 'CMI_C16_scale']).toArray()
+    offsets = image.toDictionary(['CMI_C13_offset', 'CMI_C14_offset', 'CMI_C15_offset', 'CMI_C16_offset']).toArray()
+    scales_image = ee.Image.constant([scales.get([0]), scales.get([1]), scales.get([2]), scales.get([3])])
+    offsets_image = ee.Image.constant([offsets.get([0]), offsets.get([1]), offsets.get([2]), offsets.get([3])])
+
+    brightness_temps = im.multiply(scales_image).add(offsets_image)
 
     #return reflectances.addBands(srcImg=brightness_temps, names=['CMI_C14', 'CMI_C15'])
     return brightness_temps
@@ -89,9 +93,6 @@ Preprocessing function for GOES images.
 image (ee.Image): GOES image to process.
 """
 def process_GOES(image):
-    ######################################
-    # GOES portion
-
     # Scaling and offset
     #image2 = ee.Image(feature.get('matched_img'))
     GOES_image = scale_and_offset_GOES(image)
@@ -194,8 +195,8 @@ if __name__ == '__main__':
         num = processed.size().getInfo()
 
     # Ensure there is a GOES directory made for the city and set it as the prefix to the filename
-    subprocess.call(['mkdir', '-p', f'/home/jonstar/urban_heat_dataset/{city}/GOES'])
-    file_prefix = f'/home/jonstar/urban_heat_dataset/{city}/GOES'
+    subprocess.call(['mkdir', '-p', f'/home/jonstar/scratch/{city}_GOES'])
+    file_prefix = f'/home/jonstar/scratch/{city}_GOES'
    
     if city in ['Seattle', 'San_Francisco', 'Los_Angeles', 'San_Diego', 'Phoenix', 'Las_Vegas', 'Salt_Lake_City']:
         g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/GOES_West_times.csv')
