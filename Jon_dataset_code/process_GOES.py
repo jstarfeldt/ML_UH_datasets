@@ -30,6 +30,57 @@ proj_zone = {
     'La_Paz':[19, False], 'Montevideo':[21, False], 'Brasilia':[22, False], 'Caracas':[19, True]
 }
 
+city_str_dict = {
+    'Atlanta': 'Atlanta, Georgia, USA',
+    'Billings': 'Billings, Montana, USA',
+    'Bogota': 'Bogota, Colombia',
+    'Brasilia': 'Brasilia, Brazil',
+    'Buenos_Aires': 'Buenos Aires, Argentina',
+    'Cancun': 'Cancun, Mexico',
+    'Caracas': 'Caracas, Venezuela',
+    'Charlotte': 'Charlotte, North Carolina, USA',
+    'Chicago': 'Chicago, Illinois, USA',
+    'Dallas': 'Dallas, Texas, USA and Fort Worth, Texas, USA',
+    'Denver': 'Denver, Colorado, USA',
+    'Guadalajara': 'Guadalajara, Mexico',
+    'Guatemala_City': 'Guatemala City, Guatemala',
+    'Havana': 'Havana, Cuba',
+    'Houston': 'Houston, Texas, USA',
+    'Jacksonville': 'Jacksonville, Florida, USA',
+    'La_Paz': 'La Paz, Bolivia',
+    'Las_Vegas': 'Las Vegas, Nevada, USA',
+    'Lima': 'Lima, Peru',
+    'Los_Angeles': 'Los Angeles, California, USA',
+    'Managua': 'Managua, Nicaragua',
+    'Manaus': 'Manaus, Brazil',
+    'Mexico_City': 'Mexico City, Mexico',
+    'Miami': 'Miami, Florida, USA',
+    'Minneapolis': 'Minneapolis, Minnesota, USA',
+    'Monterrey': 'Monterrey, Mexico',
+    'Montevideo': 'Montevideo, Uruguay',
+    'Montreal': 'Montreal, Quebec, Canada',
+    'New_Orleans': 'New Orleans, Louisiana, USA',
+    'NYC': 'New York City, New York, USA',
+    'Panama_City': 'Panama City, Panama',
+    'Philadelphia': 'Philadelphia, Pennsylvania, USA',
+    'Phoenix': 'Phoenix, Arizona, USA',
+    'Punta_Arenas': 'Punta Arenas, Chile',
+    'Quito': 'Quito, Ecuador',
+    'Salt_Lake_City': 'Salt Lake City, Utah, USA',
+    'San_Diego': 'San Diego, California, USA and Tijuana, Mexico',
+    'San_Francisco': 'San Francisco, California, USA and San Jose, California, USA',
+    'San_Jose': 'San Jose, Costa Rica',
+    'San_Juan': 'San Juan, Puerto Rico',
+    'Santiago': 'Santiago, Chile',
+    'Santo_Domingo': 'Santo Domingo, Dominican Republic',
+    'Sao_Paulo': 'Sao Paulo, Brazil',
+    'Seattle': 'Seattle, Washington, USA',
+    'St_Louis': 'St Louis, Missouri, USA',
+    'Tegucigalpa': 'Tegucigalpa, Honduras',
+    'Toronto': 'Toronto, Ontario, USA',
+    'DMV': 'Washington, DC, USA and Baltimore, Maryland, USA'
+}
+
 
 """
 Processing of individual .tif files.
@@ -103,14 +154,14 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
     """
     def time_adjust(longitude, dt=utc_dt):
         local_dt = dt + datetime.timedelta(hours=(longitude/360)*24) # Adjusting for global local time
-        time_index = local_dt.hour*4 + round(local_dt.minute/15+local_dt.second/3600) # Used in selection of datetime index from mw file (every 15 minutes)
+        time_index = local_dt.hour*4 + round(local_dt.minute/15+local_dt.second/900) # Used in selection of datetime index from mw file (every 15 minutes)
         return time_index
 
     func = np.vectorize(time_adjust)
     time_indices = func(latlon_pts[:,:,0])
 
     # Accounting for rounding of values to timestep of following day
-    if np.sum(time_indices<96) < 2025: 
+    if np.sum(time_indices<96) < 2025 and date_str1 == date_str2: 
         local_dt2 = local_dt2 + datetime.timedelta(days=1)
         date_str2 = f'{local_dt2.year}{stringify(local_dt2.month)}{stringify(local_dt2.day)}'
 
@@ -120,22 +171,24 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
         return
 
     if date_str1 != date_str2: # When data spans two days (two different files)
-        dsMW = xr.open_dataset(f'/scratch/zt1/project/gcurbanheat/user/jonstar/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
+        dsMW = xr.open_dataset(f'/scratch/zt1/project/mjmolina-prj/user/jonstar/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
         dsMW = dsMW.assign_coords(
             datetime=("phony_dim_0", pd.date_range(start=date_str1, periods=96, freq="15min")),
             longitude=("phony_dim_1", np.arange(-180,180,0.25)),
             latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))
  
-        dsMW2 = xr.open_dataset(f'/scratch/zt1/project/gcurbanheat/user/jonstar/mw_data/MW_LST_DTC_{date_str2}_x1y.h5', engine='h5netcdf')
+        dsMW2 = xr.open_dataset(f'/scratch/zt1/project/mjmolina-prj/user/jonstar/mw_data/MW_LST_DTC_{date_str2}_x1y.h5', engine='h5netcdf')
         dsMW2 = dsMW.assign_coords(
             datetime=("phony_dim_0", pd.date_range(start=date_str2, periods=96, freq="15min")),
             longitude=("phony_dim_1", np.arange(-180,180,0.25)),
             latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))    
 
         dsMW = xr.concat([dsMW.to_dataarray()[0], dsMW2.to_dataarray()[0]], dim='phony_dim_0') # Concatenate arrays to be continuous
+        # When data is split over two days, the time indices will end on 95 from day 1 and start on 0 from day 2. Now that the two days
+        # are concatenated, 0 for day 2 is index 96. The indices are adjusted to reflect this change.
         time_indices = np.where(time_indices>90, time_indices, time_indices+96) # Adjust time indices to be in continuous order
     else:
-        dsMW = xr.open_dataset(f'/scratch/zt1/project/gcurbanheat/user/jonstar/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
+        dsMW = xr.open_dataset(f'/scratch/zt1/project/mjmolina-prj/user/jonstar/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
         dsMW = dsMW.assign_coords(
             datetime=("phony_dim_0", pd.date_range(start=date_str1, periods=96, freq="15min")),
             longitude=("phony_dim_1", np.arange(-180,180,0.25)),
@@ -175,6 +228,67 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
     # Flip coordinates so latitude increases with index
     geotiff_ds = geotiff_ds.reindex(y=geotiff_ds.y[::-1])
 
+    # Add file metadata
+    if city in ['Seattle', 'San_Francisco', 'Los_Angeles', 'San_Diego', 'Phoenix', 'Las_Vegas', 'Salt_Lake_City']:
+        geotiff_ds.attrs['title'] = f'GOES-17/18 and microwave LST data for {city_str_dict[city]}'
+    else:
+        geotiff_ds.attrs['title'] = f'GOES-16 and microwave_LST data for {city_str_dict[city]}'
+    geotiff_ds.attrs['institution'] = 'University of Maryland, College Park'
+    geotiff_ds.attrs['source'] = 'Satellite observation'
+
+    # Delete unnecessary tags
+    del geotiff_ds.attrs['TIFFTAG_XRESOLUTION']
+    del geotiff_ds.attrs['TIFFTAG_YRESOLUTION']
+    del geotiff_ds.attrs['TIFFTAG_RESOLUTIONUNIT']
+    del geotiff_ds.attrs['_FillValue']
+
+    # Add variable metadata
+    geotiff_ds['y'].attrs['standard_name'] = 'projection_y_coordinate'
+    geotiff_ds['y'].attrs['long_name'] = 'UTM Northing'
+    geotiff_ds['y'].attrs['units'] = 'm'
+
+    geotiff_ds['x'].attrs['standard_name'] = 'projection_x_coordinate'
+    geotiff_ds['x'].attrs['long_name'] = 'UTM Easting'
+    geotiff_ds['x'].attrs['units'] = 'm'
+
+    geotiff_ds['datetime'].attrs['long_name'] = 'datetime'
+    geotiff_ds['datetime'].attrs['units'] = 'YYYY-mm-DDTHH:MM:SSZ'
+    geotiff_ds['datetime'].attrs['calendar'] = 'utc'
+
+    geotiff_ds['GOES_C13_LWIR'].attrs['standard_name'] = 'toa_brightness_temperature'
+    geotiff_ds['GOES_C13_LWIR'].attrs['units'] = 'K'
+    geotiff_ds['GOES_C13_LWIR'].attrs['valid_min'] = 89.62
+    geotiff_ds['GOES_C13_LWIR'].attrs['valid_max'] = 341.27
+    geotiff_ds['GOES_C13_LWIR'].attrs['missing_value'] = np.nan
+    geotiff_ds['GOES_C13_LWIR'].attrs['wavelength'] = '10.1-10.6 µm'
+
+    geotiff_ds['GOES_C14_LWIR'].attrs['standard_name'] = 'toa_brightness_temperature'
+    geotiff_ds['GOES_C14_LWIR'].attrs['units'] = 'K'
+    geotiff_ds['GOES_C14_LWIR'].attrs['valid_min'] = 96.19
+    geotiff_ds['GOES_C14_LWIR'].attrs['valid_max'] = 341.28
+    geotiff_ds['GOES_C14_LWIR'].attrs['missing_value'] = np.nan
+    geotiff_ds['GOES_C14_LWIR'].attrs['wavelength'] = '10.8-11.6 µm'
+
+    geotiff_ds['GOES_C15_LWIR'].attrs['standard_name'] = 'toa_brightness_temperature'
+    geotiff_ds['GOES_C15_LWIR'].attrs['units'] = 'K'
+    geotiff_ds['GOES_C15_LWIR'].attrs['valid_min'] = 97.38
+    geotiff_ds['GOES_C15_LWIR'].attrs['valid_max'] = 341.28
+    geotiff_ds['GOES_C15_LWIR'].attrs['missing_value'] = np.nan
+    geotiff_ds['GOES_C15_LWIR'].attrs['wavelength'] = '11.8-12.8 µm'
+
+    geotiff_ds['GOES_C16_LWIR'].attrs['standard_name'] = 'toa_brightness_temperature'
+    geotiff_ds['GOES_C16_LWIR'].attrs['units'] = 'K'
+    geotiff_ds['GOES_C16_LWIR'].attrs['valid_min'] = 92.7
+    geotiff_ds['GOES_C16_LWIR'].attrs['valid_max'] = 318.26
+    geotiff_ds['GOES_C16_LWIR'].attrs['missing_value'] = np.nan
+    geotiff_ds['GOES_C16_LWIR'].attrs['wavelength'] = '13.0-13.6 µm'
+
+    geotiff_ds['microwave_LST'].attrs['standard_name'] = 'surface_temperature'
+    geotiff_ds['microwave_LST'].attrs['units'] = 'K'
+    geotiff_ds['microwave_LST'].attrs['missing_value'] = np.nan
+    geotiff_ds['microwave_LST'].attrs['wavelength'] = '0.81-0.83 cm'
+    geotiff_ds['microwave_LST'].attrs['grid_mapping'] = 'spatial_ref'
+
     #########################################################################################################
     # Optional filtering by lat/lon
     if coord_bounds:
@@ -209,13 +323,8 @@ if __name__ == '__main__':
     utm_proj = Proj(projparams=proj_code)
 
     if city in ['Seattle', 'San_Francisco', 'Los_Angeles', 'San_Diego', 'Phoenix', 'Las_Vegas', 'Salt_Lake_City']:
-        GOES_west = True
-    else:
-        GOES_west = False
-   
-    if GOES_west:
         g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/GOES_West_times.csv').value
-        indices = [25268, 50775, 76786, 103146]
+        indices = [25268, 50755, 76786, 103146]
     else:
         g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/GOES_East_times.csv').value
         indices = [25994, 52337, 78338, 104730]
@@ -246,12 +355,12 @@ if __name__ == '__main__':
     def sort_func_GOES(s):
         return int(s.split('image_')[1].split('.tif')[0])
 
-    GOES_tif_list = sorted(glob.glob(f'/scratch/zt1/project/gcurbanheat/user/jonstar/{city}_GOES/*.tif'), key=sort_func_GOES)
+    GOES_tif_list = sorted(glob.glob(f'/scratch/zt1/project/mjmolina-prj/user/jonstar/{city}_GOES/*.tif'), key=sort_func_GOES)
     dsG = rxr.open_rasterio(GOES_tif_list[0])
     geotiff_dsG = dsG.to_dataset('band')
 
     y, x = np.meshgrid(geotiff_dsG['y'], geotiff_dsG['x'])
-    utm_coords = np.stack((x,y)).T.reshape(-1,2) # Get list of x, y coordinates following coordinate structure (x changes first)
+    utm_coords = np.stack((x,y)).T.reshape(-1,2) # Get list of y, x coordinates following coordinate structure (x changes first)
 
     def stacked_to_latlon(pt):
         return utm_proj(pt[0], pt[1], inverse=True)
