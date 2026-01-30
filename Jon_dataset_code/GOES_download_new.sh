@@ -12,15 +12,19 @@
 # Memory per CPU core
 #SBATCH --mem-per-cpu=512
 
-#source /home/jonstar/scratch/condaroot/Miniforge3-24.11.3-2-Linux-x86_64.sh
-#mamba activate heat
-export PATH=/home/jonstar/scratch/condaroot/miniforge3-24.11.3/bin:$PATH
-source activate heat
+#export PATH=/home/jonstar/scratch/condaroot/miniforge3-24.11.3/bin:$PATH
+#source activate heat
+~/scratch/conda-pack-unpacker.sh -f ~/scratch/heat.tar.gz
+if [ $? -ne 0 ]; then
+    echo "[ERROR] Error unpackaging ~/scratch/foo.tar.gz"
+    exit 1
+fi
 
 echo "First argument: $1"
 
 cd /home/jonstar/ML_UH_datasets/Jon_dataset_code
-python GOES_download_new.py --city=$1 --n=105120 --startFile=0 --cpus=30
+#/tmp/$USER/heat/bin/python GOES_download_new.py --city=$1 --n=25994 --startFile=0 --cpus=30
+/tmp/$USER/heat/bin/python GOES_download_new.py --city=$1 --n=105120 --startFile=0 --cpus=32
 #python GOES_download_new.py --city=$1 --n=5000 --startFile=5000 --cpus=30
 #python GOES_download_new.py --city=$1 --n=5000 --startFile=10000 --cpus=30
 #python GOES_download_new.py --city=$1 --n=5000 --startFile=15000 --cpus=30

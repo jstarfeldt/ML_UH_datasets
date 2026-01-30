@@ -2,6 +2,7 @@ import ee
 import pandas as pd
 import numpy as np
 from datetime import datetime
+import glob
 import multiprocessing
 import argparse
 import subprocess
@@ -202,10 +203,14 @@ if __name__ == '__main__':
         g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/GOES_West_times.csv')
     else:
         g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/GOES_East_times.csv')
-    #indexes = np.arange(start,start+num)
-    time_strs = g_times.datetime[start:start+num]
 
-    inputs = [[str(city), city_export, str(time_str), f'{file_prefix}/GOES_image_{time_str}.tif'] for time_str in time_strs]
+    time_strs = g_times.datetime[start:start+num]
+    full_file_list = [f'{file_prefix}/GOES_image_{time_str}.tif' for time_str in time_strs] 
+    current_file_list = sorted(glob.glob(f'{file_prefix}/*'))
+    missing_indices = np.where([x not in current_file_list for x in full_file_list])[0]
+    print('Length of missing indices:', len(missing_indices))
+
+    inputs = [[str(city), city_export, str(time_str), f'{file_prefix}/GOES_image_{time_str}.tif'] for time_str in time_strs[missing_indices]]
 
     print('Starting multiprocessing')
 

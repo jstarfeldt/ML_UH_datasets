@@ -373,7 +373,12 @@ if __name__ == '__main__':
     geotiff_dsG.close()
 
     file_index = np.arange(start, end)
-    inputs = [[GOES_tif_list[i], datetime.datetime.fromtimestamp(g_times[i]/1000, datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'), latlon_pts_2km, f'{processed_dir}/{city}_{GOES_tif_list[i].split('/')[-1].split('.')[0]}.nc'] for i in file_index]
+    full_file_list = [f'{processed_dir}/{city}_{GOES_tif_list[i].split('/')[-1].split('.')[0]}.nc' for i in file_index]
+    current_file_list = sorted(glob.glob(f'{processed_dir}/*'))
+    missing_indices = np.where([x not in current_file_list for x in full_file_list])[0]
+    print('Length of missing indices:', len(missing_indices))
+
+    inputs = [[GOES_tif_list[i], datetime.datetime.fromtimestamp(g_times[i]/1000, datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'), latlon_pts_2km, f'{processed_dir}/{city}_{GOES_tif_list[i].split('/')[-1].split('.')[0]}.nc'] for i in file_index[missing_indices]]
 
     #print('Starting multiprocessing')
 
