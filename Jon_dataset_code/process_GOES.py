@@ -168,60 +168,60 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
     # Accounting for files we do not have currently
     if date_str1 == '20211231' or date_str2 == '20211231' or date_str1 == '20220322' or date_str2 == '20220322':
         print('date string identifited')
-        return
-
-    if date_str1 != date_str2: # When data spans two days (two different files)
-        dsMW = xr.open_dataset(f'/scratch/zt1/project/mjmolina-prj/user/jonstar/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
-        dsMW = dsMW.assign_coords(
-            datetime=("phony_dim_0", pd.date_range(start=date_str1, periods=96, freq="15min")),
-            longitude=("phony_dim_1", np.arange(-180,180,0.25)),
-            latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))
- 
-        dsMW2 = xr.open_dataset(f'/scratch/zt1/project/mjmolina-prj/user/jonstar/mw_data/MW_LST_DTC_{date_str2}_x1y.h5', engine='h5netcdf')
-        dsMW2 = dsMW.assign_coords(
-            datetime=("phony_dim_0", pd.date_range(start=date_str2, periods=96, freq="15min")),
-            longitude=("phony_dim_1", np.arange(-180,180,0.25)),
-            latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))    
-
-        dsMW = xr.concat([dsMW.to_dataarray()[0], dsMW2.to_dataarray()[0]], dim='phony_dim_0') # Concatenate arrays to be continuous
-        # When data is split over two days, the time indices will end on 95 from day 1 and start on 0 from day 2. Now that the two days
-        # are concatenated, 0 for day 2 is index 96. The indices are adjusted to reflect this change.
-        time_indices = np.where(time_indices>90, time_indices, time_indices+96) # Adjust time indices to be in continuous order
+        mw_interpolated = np.empty((45, 45))
+        mw_interpolated[:] = np.nan
     else:
-        dsMW = xr.open_dataset(f'/scratch/zt1/project/mjmolina-prj/user/jonstar/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
-        dsMW = dsMW.assign_coords(
-            datetime=("phony_dim_0", pd.date_range(start=date_str1, periods=96, freq="15min")),
-            longitude=("phony_dim_1", np.arange(-180,180,0.25)),
-            latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))
+        if date_str1 != date_str2: # When data spans two days (two different files)
+            dsMW = xr.open_dataset(f'/scratch/zt1/project/mjmolina-prj/user/jonstar/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
+            dsMW = dsMW.assign_coords(
+                datetime=("phony_dim_0", pd.date_range(start=date_str1, periods=96, freq="15min")),
+                longitude=("phony_dim_1", np.arange(-180,180,0.25)),
+                latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))
+     
+            dsMW2 = xr.open_dataset(f'/scratch/zt1/project/mjmolina-prj/user/jonstar/mw_data/MW_LST_DTC_{date_str2}_x1y.h5', engine='h5netcdf')
+            dsMW2 = dsMW.assign_coords(
+                datetime=("phony_dim_0", pd.date_range(start=date_str2, periods=96, freq="15min")),
+                longitude=("phony_dim_1", np.arange(-180,180,0.25)),
+                latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))    
 
+            dsMW = xr.concat([dsMW.to_dataarray()[0], dsMW2.to_dataarray()[0]], dim='phony_dim_0') # Concatenate arrays to be continuous
+            # When data is split over two days, the time indices will end on 95 from day 1 and start on 0 from day 2. Now that the two days
+            # are concatenated, 0 for day 2 is index 96. The indices are adjusted to reflect this change.
+            time_indices = np.where(time_indices>90, time_indices, time_indices+96) # Adjust time indices to be in continuous order
+        else:
+            dsMW = xr.open_dataset(f'/scratch/zt1/project/mjmolina-prj/user/jonstar/mw_data/MW_LST_DTC_{date_str1}_x1y.h5', engine='h5netcdf')
+            dsMW = dsMW.assign_coords(
+                datetime=("phony_dim_0", pd.date_range(start=date_str1, periods=96, freq="15min")),
+                longitude=("phony_dim_1", np.arange(-180,180,0.25)),
+                latitude=("phony_dim_2", np.arange(-60,90,0.25)[::-1]))
 
-    max_lon_index = np.where(dsMW['longitude'] == get_next_latlon_coord(np.max(latlon_pts[:,:,0]), True))[0][0]
-    min_lon_index = np.where(dsMW['longitude'] == get_next_latlon_coord(np.min(latlon_pts[:,:,0]), False))[0][0]
-    max_lat_index = np.where(dsMW['latitude'] == get_next_latlon_coord(np.max(latlon_pts[:,:,1]), True))[0][0]
-    min_lat_index = np.where(dsMW['latitude'] == get_next_latlon_coord(np.min(latlon_pts[:,:,1]), False))[0][0]
+        max_lon_index = np.where(dsMW['longitude'] == get_next_latlon_coord(np.max(latlon_pts[:,:,0]), True))[0][0]
+        min_lon_index = np.where(dsMW['longitude'] == get_next_latlon_coord(np.min(latlon_pts[:,:,0]), False))[0][0]
+        max_lat_index = np.where(dsMW['latitude'] == get_next_latlon_coord(np.max(latlon_pts[:,:,1]), True))[0][0]
+        min_lat_index = np.where(dsMW['latitude'] == get_next_latlon_coord(np.min(latlon_pts[:,:,1]), False))[0][0]
 
-    # Create microwave array for specific area
-    # Remember: latitude decreases with index
-    if date_str1 != date_str2: # Concatenation removes TB37V_LST_DTC variable
-        mw_clipped = dsMW[np.min(time_indices):np.max(time_indices)+1,min_lon_index:max_lon_index+1,max_lat_index:min_lat_index+1]
-        dsMW.close()
-        dsMW2.close()
-    else:
-        mw_clipped = dsMW['TB37V_LST_DTC'][np.min(time_indices):np.max(time_indices)+1,min_lon_index:max_lon_index+1,max_lat_index:min_lat_index+1]
-        dsMW.close()
+        # Create microwave array for specific area
+        # Remember: latitude decreases with index
+        if date_str1 != date_str2: # Concatenation removes TB37V_LST_DTC variable
+            mw_clipped = dsMW[np.min(time_indices):np.max(time_indices)+1,min_lon_index:max_lon_index+1,max_lat_index:min_lat_index+1]
+            dsMW.close()
+            dsMW2.close()
+        else:
+            mw_clipped = dsMW['TB37V_LST_DTC'][np.min(time_indices):np.max(time_indices)+1,min_lon_index:max_lon_index+1,max_lat_index:min_lat_index+1]
+            dsMW.close()
 
-    y, x = np.meshgrid(mw_clipped['latitude'], mw_clipped['longitude'])
-    mw_latlons = np.stack((x,y)).T.reshape(-1,2)
+        y, x = np.meshgrid(mw_clipped['latitude'], mw_clipped['longitude'])
+        mw_latlons = np.stack((x,y)).T.reshape(-1,2)
 
-    interpolated_arrays = []
-    for arr in mw_clipped:
-        mw_interpolated = interpolate.griddata(mw_latlons, arr.T.values.reshape(-1)/50, latlon_pts, method='nearest')
-        interpolated_arrays.append(mw_interpolated)
-    interpolated_array = np.stack(interpolated_arrays) # Interpolated microwave values from each time index n of shape (n,45,45)
-    interpolated_indices = time_indices-np.min(time_indices) # Array of shape (45,45) that select time indices from the value array
-    
-    # Index the first dimension of the value array
-    mw_interpolated = interpolated_array[interpolated_indices, np.arange(45)[:, None], np.arange(45)]
+        interpolated_arrays = []
+        for arr in mw_clipped:
+            mw_interpolated = interpolate.griddata(mw_latlons, arr.T.values.reshape(-1)/50, latlon_pts, method='nearest')
+            interpolated_arrays.append(mw_interpolated)
+        interpolated_array = np.stack(interpolated_arrays) # Interpolated microwave values from each time index n of shape (n,45,45)
+        interpolated_indices = time_indices-np.min(time_indices) # Array of shape (45,45) that select time indices from the value array
+        
+        # Index the first dimension of the value array
+        mw_interpolated = interpolated_array[interpolated_indices, np.arange(45)[:, None], np.arange(45)]
 
     geotiff_ds['microwave_LST'] = (('y','x'), mw_interpolated)
 
