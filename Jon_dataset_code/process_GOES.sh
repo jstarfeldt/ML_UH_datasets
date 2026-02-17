@@ -24,4 +24,4 @@ echo "First argument: $1"
 echo "Second argument: $2"
 
 cd /home/jonstar/ML_UH_datasets/Jon_dataset_code
-/tmp/$USER/heat/bin/python process_GOES.py --city=$1 --cpus=16 --section=$2
+/tmp/$USER/heat/bin/python process_GOES.py --city=$1 --cpus=32 --section=$2
