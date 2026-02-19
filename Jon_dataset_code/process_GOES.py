@@ -30,6 +30,7 @@ proj_zone = {
     'La_Paz':[19, False], 'Montevideo':[21, False], 'Brasilia':[22, False], 'Caracas':[19, True]
 }
 
+# Dictionary for full city name strings
 city_str_dict = {
     'Atlanta': 'Atlanta, Georgia, USA',
     'Billings': 'Billings, Montana, USA',
@@ -82,20 +83,21 @@ city_str_dict = {
 }
 
 
-"""
-Processing of individual .tif files.
 
-Performs a variety of tasks on the data to make it more easy to read and understand.
-
-Attributes:
-    tif (str): Path where tif file is located.
-    time (str): Date and time of when the data was collected format YYYY-MM-DDThh:mm:ssZ.
-    latlon_pts (float array): (45,45,2) Array of (longitude, latitude) points at each point on the utm grid.
-    fname (str): Full path of where to store the file, including a filename ending in '.nc'.
-    coord_bounds (tuple or list, optional): Coordinate bounds if you wish to filter the data by location. Order should be
-                                    (longitude minimum, longitude maximum, latitude minimum, latitude maximum).
-"""
 def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
+    """
+    Processing of individual .tif files. Performs a variety of tasks on
+    the data to make it easier to read and understand and saves the
+    data as a netCDF file.
+
+    Args:
+    tif (str): Path where tif file is located
+    time (str): Date and time of when the data was collected format YYYY-MM-DDThh:mm:ssZ
+    latlon_pts (float array): (45,45,2) Array of (longitude, latitude) points at each point on the utm grid
+    fname (str): Full path of where to store the file, including a filename ending in '.nc'
+    coord_bounds (tuple or list, optional): Coordinate bounds if you wish to filter the data by location. The order should be
+                                    (longitude minimum, longitude maximum, latitude minimum, latitude maximum)
+    """
     #########################################################################################################
     # Open file and rename variables
     dsG = rxr.open_rasterio(tif)
@@ -106,30 +108,39 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
 
     #########################################################################################################
     # Process microwave data
-    """
-    Returns the value rounded up or down to the nearest 0.25.
-
-    Attributes:
-        n (float): latitude or longitude coordinate.
-        above (boolean): True for round up, False for round down.
-    """
     def get_next_latlon_coord(n, above=True):
+        """
+        Returns the value rounded up or down to the nearest 0.25.
+
+        Args:
+        n (float): latitude or longitude coordinate
+        above (boolean): True for round up, False for round down
+
+        Returns:
+        (float): The coordinate rounded to a multiple of 0.25
+        """
         if above:
             return np.ceil(n*4)/4
         else:
             return np.floor(n*4)/4
 
-    """
-    Returns an integer as a str, adding a zero in front if it is a single digit.
 
-    Attributes:
-        num (int): Integer to turn into a string.
-    """
     def stringify(num):
+        """
+        Returns a day integer as a str, adding a zero in front
+        if it is a single digit.
+
+        Args:
+        num (int): Integer to turn into a string
+
+        Returns:
+        (str): Two-digit day as a string
+        """
         if num >= 0 and num < 10:
             return f'0{num}'
         else:
             return str(num)
+
 
     # Calculate adjusted datetimes for the left and right edges of the image.
     # If the datetimes are across two days, values from two mw LST files need to be used.
@@ -144,21 +155,28 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
     date_str2 = f'{local_dt2.year}{stringify(local_dt2.month)}{stringify(local_dt2.day)}'
 
 
-    """
-    Adjusts a datetime in UTC to local time based on how far it is from the Prime Meridian and
-    calculates an index 0-96 of which 15-minute interval the time is in a day.
-
-    Attributes:
-        longitude (float): Longitude value.
-        dt (python datetime object): Datetime with a time in UTC.
-    """
     def time_adjust(longitude, dt=utc_dt):
+        """
+        Adjusts a datetime in UTC to local time based on how far it is from
+        the Prime Meridian and calculates an index 0-96 of which 15-minute
+        timestamp it is closest to in the day.
+
+        Args:
+        longitude (float): Longitude value
+        dt (datetime): Datetime with a time in UTC
+
+        Returns:
+        time_index (int): Integer 0-96 denoting which 15-minute timestamp the
+                          adjusted time is closest to
+        """
         local_dt = dt + datetime.timedelta(hours=(longitude/360)*24) # Adjusting for global local time
         time_index = local_dt.hour*4 + round(local_dt.minute/15+local_dt.second/900) # Used in selection of datetime index from mw file (every 15 minutes)
         return time_index
 
+    # Vectorize the time_adjust function and
+    # get the longitude values of each coordinate point
     func = np.vectorize(time_adjust)
-    time_indices = func(latlon_pts[:,:,0])
+    time_indices = func(latlon_pts[:, :, 0])
 
     # Accounting for rounding of values to timestep of following day
     if np.sum(time_indices<96) < 2025 and date_str1 == date_str2: 
@@ -213,16 +231,18 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
         y, x = np.meshgrid(mw_clipped['latitude'], mw_clipped['longitude'])
         mw_latlons = np.stack((x,y)).T.reshape(-1,2)
 
+        # For each time index in the mw_clipped array, interpolate the MW data to the GOES grid
         interpolated_arrays = []
         for arr in mw_clipped:
             mw_interpolated = interpolate.griddata(mw_latlons, arr.T.values.reshape(-1)/50, latlon_pts, method='nearest')
             interpolated_arrays.append(mw_interpolated)
         interpolated_array = np.stack(interpolated_arrays) # Interpolated microwave values from each time index n of shape (n,45,45)
         interpolated_indices = time_indices-np.min(time_indices) # Array of shape (45,45) that select time indices from the value array
-        
+
         # Index the first dimension of the value array
         mw_interpolated = interpolated_array[interpolated_indices, np.arange(45)[:, None], np.arange(45)]
 
+    # Set a new variable for the interpolated MW LST
     geotiff_ds['microwave_LST'] = (('y','x'), mw_interpolated)
 
     # Flip coordinates so latitude increases with index
@@ -242,7 +262,7 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
     del geotiff_ds.attrs['TIFFTAG_RESOLUTIONUNIT']
     del geotiff_ds.attrs['_FillValue']
 
-    # Add variable metadata
+    # Add coordinate and variable metadata
     geotiff_ds['y'].attrs['standard_name'] = 'projection_y_coordinate'
     geotiff_ds['y'].attrs['long_name'] = 'UTM Northing'
     geotiff_ds['y'].attrs['units'] = 'm'
@@ -295,11 +315,7 @@ def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
         geotiff_ds = geotiff_ds.sel(longitude=slice(coord_bounds[0], coord_bounds[1])).sel(latitude=slice(coord_bounds[3], coord_bounds[2]))
 
     #########################################################################################################
-    #try:
     geotiff_ds.to_netcdf(fname, format='NETCDF4', engine='h5netcdf')
-    #except PermissionError:
-    #    print('Excepted')
-    #    return
 
 
 if __name__ == '__main__':
@@ -310,11 +326,11 @@ if __name__ == '__main__':
     parser.add_argument('--cpus', nargs='?', const=32, help='Number of CPU cores to run in parallel')
     parser.add_argument('--section', nargs=1, help='Section of GOES files to process')
     args = parser.parse_args()
-    
-    # Pull points to make data for a specific city (look above for options)
+
+    # Set projection to process data for a specific city
+    # (look above for city options)
     city = args.city
     city_zone = proj_zone[city]
-    #utm_proj = Proj(proj="utm", zone=city_zone[0], datum="WGS84", northern=city_zone[1])
     if city_zone[1]:
         crs_prefix = '326'
     else:
@@ -322,9 +338,11 @@ if __name__ == '__main__':
     proj_code = f'EPSG:{crs_prefix}{city_zone[0]}'
     utm_proj = Proj(projparams=proj_code)
 
+    # GOES-West
     if city in ['Seattle', 'San_Francisco', 'Los_Angeles', 'San_Diego', 'Phoenix', 'Las_Vegas', 'Salt_Lake_City']:
         g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/GOES_West_times.csv').value
         indices = [25268, 50755, 76786, 103146]
+    # GOES-East
     else:
         g_times = pd.read_csv('/home/jonstar/urban_heat_dataset/GOES_East_times.csv').value
         indices = [25994, 52337, 78338, 104730]
@@ -353,8 +371,19 @@ if __name__ == '__main__':
 
 
     def sort_func_GOES(s):
+        """
+        Gets the datetime from a GOES file string.
+        Used to sort the list of files in a directory.
+
+        Args:
+        s (str): Full file location string of a GOES file
+
+        Returns:
+        (int): File datetime as an integer
+        """
         return int(s.split('image_')[1].split('.tif')[0])
 
+    # Calculate the UTM coordinates from one of the GOES files
     GOES_tif_list = sorted(glob.glob(f'/scratch/zt1/project/mjmolina-prj/user/jonstar/{city}_GOES/*.tif'), key=sort_func_GOES)
     dsG = rxr.open_rasterio(GOES_tif_list[0])
     geotiff_dsG = dsG.to_dataset('band')
@@ -363,6 +392,16 @@ if __name__ == '__main__':
     utm_coords = np.stack((x,y)).T.reshape(-1,2) # Get list of y, x coordinates following coordinate structure (x changes first)
 
     def stacked_to_latlon(pt):
+        """
+        Reprojects a point in UTM coordinates to
+        latitude and longitude coordinates.
+
+        Args:
+        pt (tuple-like): Tuple with format (x coord, y coord) to reproject
+
+        Returns:
+        (tuple): Tuple with format (longitude, latitude)
+        """
         return utm_proj(pt[0], pt[1], inverse=True)
 
     latlon_pts_2km_1d = np.array(list(map(stacked_to_latlon, utm_coords)))
@@ -372,16 +411,18 @@ if __name__ == '__main__':
     dsG.close()
     geotiff_dsG.close()
 
+    # Finds indices of files that are not currently processed
     file_index = np.arange(start, end)
     full_file_list = [f'{processed_dir}/{city}_{GOES_tif_list[i].split('/')[-1].split('.')[0]}.nc' for i in file_index]
     current_file_list = sorted(glob.glob(f'{processed_dir}/*'))
     missing_indices = np.where([x not in current_file_list for x in full_file_list])[0]
     print('Length of missing indices:', len(missing_indices))
 
+    # Sets up inputs for the multiprocessing pool
     inputs = [[GOES_tif_list[i], datetime.datetime.fromtimestamp(g_times[i]/1000, datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'), latlon_pts_2km, f'{processed_dir}/{city}_{GOES_tif_list[i].split('/')[-1].split('.')[0]}.nc'] for i in file_index[missing_indices]]
 
+    # Run multiprocessing pool
     #print('Starting multiprocessing')
-
     start = datetime.datetime.now()
     nCPUs = int(args.cpus)
     pool = multiprocessing.Pool(nCPUs)
