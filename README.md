@@ -22,4 +22,4 @@ Urban Heat MiniCubes is comprised of remotely sensed data from a number of satel
 ## How are files stored in the dataset?
 (a) Files are stratified by modality, year, month, and city in blue-colored directories. Additionally, the corresponding latitude and longitude coordinates of the export grid are provided for each city, for each modality in green-colored directories titled "latlon."
 (b) Each filename follows a general structure. The structure of city data filenames is provided in blue, and the structure of latitude and longitude coordinate filenames is provided in green.
-[directory_tree_figure.pdf](https://github.com/user-attachments/files/26038814/directory_tree_figure.pdf)
+<img width="1270" height="756" alt="directory_tree_figure" src="https://github.com/user-attachments/assets/fac4673b-daa1-4af5-b96b-4af4d35a5f67" />
