@@ -82,6 +82,56 @@ city_str_dict = {
     'DMV': 'Washington, DC, USA and Baltimore, Maryland, USA'
 }
 
+city_ICAO_codes = {
+    'Atlanta': 'KATL',
+    'Billings': 'KBIL',
+    'Bogota': 'SKBO',
+    'Brasilia': 'SBBR',
+    'Buenos_Aires': 'SAEZ',
+    'Cancun': 'MMUN',
+    'Caracas': 'SVMI',
+    'Charlotte': 'KCLT',
+    'Chicago': 'KORD',
+    'Dallas': 'KDFW',
+    'Denver': 'KDEN',
+    'Guadalajara': 'MMGL',
+    'Guatemala_City': 'MGGT',
+    'Havana': 'MUHA',
+    'Houston': 'KIAH',
+    'Jacksonville': 'KJAX',
+    'La_Paz': 'SLLP',
+    'Las_Vegas': 'KLAS',
+    'Lima': 'SPJC',
+    'Los_Angeles': 'KLAX',
+    'Managua': 'MNMG',
+    'Manaus': 'SBEG',
+    'Mexico_City': 'MMMX',
+    'Miami': 'KMIA',
+    'Minneapolis': 'KMSP',
+    'Monterrey': 'MMMY',
+    'Montevideo': 'SUMU',
+    'Montreal': 'CYUL',
+    'New_Orleans': 'KMSY',
+    'NYC': 'KJFK',
+    'Panama_City': 'MPTO',
+    'Philadelphia': 'KPHL',
+    'Phoenix': 'KPHX',
+    'Punta_Arenas': 'SCCI',
+    'Quito': 'SEQM',
+    'Salt_Lake_City': 'KSLC',
+    'San_Diego': 'KSAN',
+    'San_Francisco': 'KSFO',
+    'San_Jose': 'MROC',
+    'San_Juan': 'TJSJ',
+    'Santiago': 'SCEL',
+    'Santo_Domingo': 'MDSD',
+    'Sao_Paulo': 'SBGR',
+    'Seattle': 'KSEA',
+    'St_Louis': 'KSTL',
+    'Tegucigalpa': 'MHTG',
+    ' Toronto': 'CYYZ',
+    'DMV': 'KBWI'
+}
 
 
 def process_GOES_tif(tif, time, latlon_pts, fname, coord_bounds=None):
@@ -413,13 +463,13 @@ if __name__ == '__main__':
 
     # Finds indices of files that are not currently processed
     file_index = np.arange(start, end)
-    full_file_list = [f'{processed_dir}/{city}_{GOES_tif_list[i].split('/')[-1].split('.')[0]}.nc' for i in file_index]
+    full_file_list = [f'{processed_dir}/lresgrid_{city_ICAO_codes[city]}_{GOES_tif_list[i].split('_')[-1].split('.')[0]}.nc' for i in file_index]
     current_file_list = sorted(glob.glob(f'{processed_dir}/*'))
     missing_indices = np.where([x not in current_file_list for x in full_file_list])[0]
     print('Length of missing indices:', len(missing_indices))
 
     # Sets up inputs for the multiprocessing pool
-    inputs = [[GOES_tif_list[i], datetime.datetime.fromtimestamp(g_times[i]/1000, datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'), latlon_pts_2km, f'{processed_dir}/{city}_{GOES_tif_list[i].split('/')[-1].split('.')[0]}.nc'] for i in file_index[missing_indices]]
+    inputs = [[GOES_tif_list[i], datetime.datetime.fromtimestamp(g_times[i]/1000, datetime.UTC).strftime('%Y-%m-%dT%H:%M:%SZ'), latlon_pts_2km, f'{processed_dir}/lresgrid_{city_ICAO_codes[city]}_{GOES_tif_list[i].split('_')[-1].split('.')[0]}.nc'] for i in file_index[missing_indices]]
 
     # Run multiprocessing pool
     #print('Starting multiprocessing')
