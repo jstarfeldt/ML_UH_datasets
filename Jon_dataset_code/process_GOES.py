@@ -78,7 +78,7 @@ city_str_dict = {
     'Seattle': 'Seattle, Washington, USA',
     'St_Louis': 'St Louis, Missouri, USA',
     'Tegucigalpa': 'Tegucigalpa, Honduras',
-    'Toronto': 'Toronto, Ontario, USA',
+    'Toronto': 'Toronto, Ontario, Canada',
     'DMV': 'Washington, DC, USA and Baltimore, Maryland, USA'
 }
 
