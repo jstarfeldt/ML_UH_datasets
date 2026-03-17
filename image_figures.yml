@@ -1,0 +1,22 @@
+name: image_figures
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - cartopy=0.25.0=py313h86c3e14_0
+  - ipykernel=7.2.0=py313h7040dfc_0
+  - ipython=9.10.0=py313h06a4308_0
+  - jupyter=1.1.1=py313h06a4308_0
+  - matplotlib=3.10.8=py313h78bf25f_0
+  - numpy=2.4.2=py313h08c6c3d_0
+  - pandas=3.0.1=py313h86c3e14_0
+  - pdf2image=1.17.0=py313h06a4308_0
+  - pillow=12.1.1=py313h80991f8_0
+  - pip=26.0.1=pyhc872135_0
+  - pyproj=3.7.2=py313h563eff2_0
+  - python=3.13.12=hc97d973_100_cp313
+  - rasterio=1.5.0=py313h2005660_0
+  - svgutils=0.3.4=pyhd8ed1ab_0
+  - xarray=2025.10.1=py313h06a4308_0
+  - yaml=0.2.5=h7b6447c_0
+prefix: /glade/u/home/jstarfeldt/.conda/envs/image_figures
